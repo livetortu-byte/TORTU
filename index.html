@@ -72,12 +72,16 @@
   #app.stop .leg,#app.stop .turtle svg{animation-play-state:paused}
 
   /* ALERTAS (avatar + icono de la acción). Cerro a la izquierda, Olimpia a la derecha */
-  #alerts{position:absolute;left:6px;right:6px;bottom:8px;z-index:5;display:flex;flex-direction:column;gap:6px;pointer-events:none}
-  .toast{display:flex;padding:0 10px 10px 0;animation:tin .25s ease-out}
-  .toast.cerro{align-self:flex-start}
-  .toast.oli{align-self:flex-end}
-  .toast.out{opacity:0;transform:translateY(8px);transition:.3s}
-  @keyframes tin{from{opacity:0;transform:translateY(14px) scale(.9)}to{opacity:1;transform:none}}
+  #alerts{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .toast{position:absolute;top:-80px;display:flex;padding:0 10px 10px 0;
+    animation:alertFall var(--alert-fall-duration,8s) linear forwards}
+  .toast.cerro{left:6px}
+  .toast.oli{right:6px}
+  @keyframes alertFall{
+    0%{top:-80px;opacity:0}
+    10%,88%{opacity:1}
+    100%{top:calc(100% - 72px);opacity:0}
+  }
   .av{position:relative;flex:0 0 auto;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-size:32px;border:3px solid #fff}
   .badge{position:absolute;right:-9px;bottom:-9px;width:32px;height:32px;border-radius:50%;border:2px solid #fff;
@@ -326,6 +330,7 @@ const GIANT = 3;           // tamaño de la tortuga con regalo (3 veces)
 const GIFT_SPEED = 5;      // m/s: con regalo camina sola hasta los 100 m (≈20 s)
 const VMAX = 4;            // m/s: velocidad visual máxima normal (pisada lenta)
 let GIFT_SHOW = 5;       // s que el regalo queda en pantalla (bajo la bandera de meta)
+let ALERT_FALL_SECONDS = 8;
 const COMBO_WINDOW = 5;    // s máximos entre acciones para mantener la racha
 let giftsOn = true;        // mostrar el regalo gráfico (los regalos los envían los usuarios)
 const GIFT_CHANCE = 0.02;  // solo el bot: probabilidad de que un evento sea regalo
@@ -497,6 +502,7 @@ const ACTIONS = {
   gift:   {path:P.gift,    color:'#eab308', m:0}    // regalo: la tortuga crece x3 y camina hasta 100
 };
 const MOODS = {like:'😍', comment:'😮', follow:'🥰', share:'😄', join:'😃', gift:'🤩'};
+const POSITIVE_MOODS = new Set(['like', 'follow', 'share', 'join', 'gift']);
 
 /* Regalos tipo TikTok LIVE (emojis de reemplazo, no los gráficos oficiales).
    El evento gift puede traer "gift":"rose"|"donut"|...; si no viene o no se conoce, se muestra 🎁. */
@@ -531,11 +537,12 @@ function showAlert(ev){
     : `<span class="badge"><i class="mflag ${ev.team}"></i></span>`;
   const t = document.createElement('div');
   t.className = 'toast ' + ev.team;
+  t.style.setProperty('--alert-fall-duration', `${ALERT_FALL_SECONDS}s`);
   t.innerHTML = `<div class="av"><span class="avin"></span>${badge}</div>`;
   fillAvatar(t.querySelector('.avin'), ev);
   box.appendChild(t);
   while(box.children.length > 4) box.removeChild(box.firstChild);
-  setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(), 300); }, 3200);
+  setTimeout(()=>t.remove(), ALERT_FALL_SECONDS * 1000);
 }
 
 const metersOf = type => cfg.meters && cfg.meters[type] >= 0 ? +cfg.meters[type] : ACTIONS[type].m;   // metros del panel o por defecto
@@ -545,8 +552,11 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
   lastEventAt = performance.now();
   for(const k in teams) teams[k].idle = lastEventAt;
   showAlert(ev);
-  t.moodEmoji = MOODS[ev.type];
-  t.moodUntil = performance.now() + 2200;
+  const moodNow = performance.now();
+  if(POSITIVE_MOODS.has(ev.type) || moodNow >= t.moodUntil){
+    t.moodEmoji = MOODS[ev.type];
+    t.moodUntil = moodNow + 10000;
+  }
   sfx(ev.type);                          // sonido + voz en off
   if(ev.type === 'comment' && ev.text) say(spokenName(ev.user) + ' dice: ' + ev.text);
   if(ev.type === 'gift'){                // regalo de un usuario: tortuga x3 y camina sola; avatar en el caparazón
@@ -646,6 +656,7 @@ function setLane(k, on){ teams[k].autoOn = on; if(!on){ hideSlot(k); clearPilot(
 function applyCfg(c){
   cfg = c || {};
   GIFT_SHOW = cfg.show > 0 ? cfg.show : 5;
+  ALERT_FALL_SECONDS = Number.isFinite(Number(cfg.alertFall)) ? Math.max(3, Math.min(20, Number(cfg.alertFall))) : 8;
   poolGifts = Array.isArray(cfg.gifts) ? GIFTS.filter(g => cfg.gifts.includes(g.k)) : GIFTS;
   setGift(cfg.on !== false);
   for(const k in teams) if(cfg.lanes && k in cfg.lanes && cfg.lanes[k] !== teams[k].autoOn) setLane(k, cfg.lanes[k]);
