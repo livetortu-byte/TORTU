@@ -10,7 +10,8 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <title>Overlay Tortugas</title>
   <script src="/api-config.js"></script>
-  <script src="/overlay-coordinator.js"></script>
+  <script src="/pwa-runtime.js"></script>
+  <script src="/overlay-coordinator.js?v=18"></script>
   <style>
     html, body {
       margin: 0;
@@ -332,9 +333,9 @@
       window.TortuOverlayCoordinator.start({ publicId: overlayMatch[1], apiBase });
     }
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js').catch(error => {
-        console.error('No se pudo registrar el service worker:', error);
-      });
+      navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
+        .then(registration => registration.update())
+        .catch(error => console.error('No se pudo actualizar el service worker:', error));
     }
   </script>
 </body>

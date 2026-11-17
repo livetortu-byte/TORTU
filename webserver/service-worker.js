@@ -1,7 +1,8 @@
-const CACHE_NAME = 'tortulive-shell-v17';
+const CACHE_NAME = 'tortulive-shell-v19';
 const APP_SHELL = [
   '/',
   '/dashboard.html',
+  '/pwa-runtime.js',
   '/api-config.js',
   '/scene-picker.js',
   '/flag-picker.js',
@@ -10,7 +11,7 @@ const APP_SHELL = [
   '/layers/progress-controller.js',
   '/layers/turtle-controller.js',
   '/layers/event-sounds.js',
-  '/overlay-coordinator.js',
+  '/overlay-coordinator.js?v=18',
   '/manifest.webmanifest',
   '/assets/icon.svg',
   '/assets/icon-192.png',
