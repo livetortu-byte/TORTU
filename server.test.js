@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { readFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
@@ -33,9 +35,11 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
   try { savedConfig = await readFile(configFile); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const port = await availablePort();
   const base = `http://127.0.0.1:${port}`;
+  const giftCounterFile = path.join(tmpdir(), `tortugas-gift-counter-${randomUUID()}.json`);
+  await writeFile(giftCounterFile, JSON.stringify({ count: 7, roomId: 'test-room' }));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0' },
+    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0', GIFT_COUNTER_PATH: giftCounterFile },
     stdio: 'ignore'
   });
   let socket;
@@ -53,7 +57,8 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     for (const page of ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/sw.js']) {
       assert.equal((await fetch(base + page)).status, 200, `${page} should be served`);
     }
-    assert.deepEqual(await (await fetch(base + '/api/connector-logs')).json(), []);
+    const startupLogs = await (await fetch(base + '/api/connector-logs')).json();
+    assert.ok(startupLogs.some(log => log.message.includes('Servidor iniciado')));
     await post(base, '/api/disconnect', {});
     const connectorLogs = await (await fetch(base + '/api/connector-logs')).json();
     assert.ok(connectorLogs.some(log => log.message.toLowerCase().includes('desconectado')));
@@ -68,7 +73,19 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     assert.equal((await config.json()).meters.comment, 8);
 
     socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const initialGiftCounter = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Initial gift counter timed out')), 3000);
+      const onMessage = message => {
+        const data = JSON.parse(message.toString());
+        if (data.type !== 'giftCounter') return;
+        clearTimeout(timeout);
+        socket.off('message', onMessage);
+        resolve(data.count);
+      };
+      socket.on('message', onMessage);
+    });
     await once(socket, 'open');
+    assert.equal(await initialGiftCounter, 7);
     const streamedConnectorLog = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Connector log timed out')), 3000);
       const onMessage = message => {
@@ -135,5 +152,6 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     await once(child, 'exit');
     if (savedConfig) await writeFile(configFile, savedConfig);
     else await rm(configFile, { force: true });
+    await rm(giftCounterFile, { force: true });
   }
 });

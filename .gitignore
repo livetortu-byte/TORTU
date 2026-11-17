@@ -1,6 +1,7 @@
 node_modules/
 **/node_modules/
 .tortugas-config.json
+.tortugas-gift-counter.json
 .env
 .env.*
 !.env.example

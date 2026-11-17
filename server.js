@@ -8,6 +8,7 @@ import { TikTokLiveConnection, WebcastEvent } from 'tiktok-live-connector';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT) || 3000;
 const configPath = process.env.CONFIG_PATH || path.join(root, '.tortugas-config.json');
+const giftCounterPath = process.env.GIFT_COUNTER_PATH || path.join(path.dirname(configPath), '.tortugas-gift-counter.json');
 const RETRY_MS = 5000;
 const RETRY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_EVENTS = 500;
@@ -29,6 +30,17 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') console.warn('No se pudo cargar la configuración guardada:', error.message);
 }
+let giftCounter = 0;
+let giftRoomId = '';
+try {
+  const saved = JSON.parse(await readFile(giftCounterPath, 'utf8'));
+  if (Number.isSafeInteger(saved.count) && saved.count >= 0 && typeof saved.roomId === 'string') {
+    giftCounter = saved.count;
+    giftRoomId = saved.roomId.slice(0, 100);
+  } else console.warn('El contador de regalos guardado no tiene un formato válido.');
+} catch (error) {
+  if (error.code !== 'ENOENT') console.warn('No se pudo cargar el contador de regalos:', error.message);
+}
 let status = { state: 'disconnected', username: 'tortulive', retryCount: 0, message: 'Desconectado' };
 let connection = null;
 let connectionGeneration = 0;
@@ -39,6 +51,7 @@ const userTeams = new Map();
 const eventLog = [];
 const connectorLogs = [];
 const sockets = new Set();
+let giftCounterWrite = Promise.resolve();
 
 function broadcast(payload) {
   const text = JSON.stringify(payload);
@@ -51,7 +64,9 @@ function setStatus(next) {
   status = { ...status, ...next };
   const level = status.state === 'failed' ? 'error' : status.state === 'retrying' ? 'warn' : 'info';
   const username = status.username ? ` @${status.username}` : '';
-  recordConnectorLog(level, `${status.state}${username} — ${status.message || ''}`);
+  const attempt = status.message === 'Conectando a TikTok…' ? ` (intento ${status.retryCount + 1})` : '';
+  const retryAt = status.nextRetryAt ? `; próximo intento ${new Date(status.nextRetryAt).toISOString()}` : '';
+  recordConnectorLog(level, `${status.state}${username}${attempt} — ${status.message || ''}${retryAt}`);
   broadcast({ type: 'connection', status });
 }
 
@@ -78,11 +93,19 @@ function recordConnectorLog(level, message) {
   broadcast({ type: 'connectorLog', log });
 }
 
+function persistGiftCounter() {
+  const snapshot = JSON.stringify({ count: giftCounter, roomId: giftRoomId });
+  giftCounterWrite = giftCounterWrite.catch(() => {}).then(() => writeFile(giftCounterPath, snapshot, 'utf8'));
+  giftCounterWrite.catch(error => console.error('No se pudo guardar el contador de regalos:', error.message));
+}
+
 function connectionError(error) {
   const exception = error?.exception;
   const statusCode = exception?.response?.status || exception?.status;
-  if (statusCode) return `TikTok respondió con HTTP ${statusCode}`;
-  return safeConnectorText(exception?.message || error?.info || error?.message || 'Error de conexión', 180);
+  const errorName = exception?.name || error?.name;
+  const prefix = errorName && errorName !== 'Error' ? `${errorName}: ` : '';
+  if (statusCode) return safeConnectorText(`${prefix}TikTok respondió con HTTP ${statusCode}`, 180);
+  return safeConnectorText(`${prefix}${exception?.message || error?.info || error?.message || 'Error de conexión'}`, 180);
 }
 
 function normalizeTeam(text) {
@@ -151,6 +174,11 @@ function publishEvent({ type, user, nickname, avatar, text, gift, count = 1, tea
   event.content = safeType === 'comment' ? event.text : safeType === 'gift' ? `${event.count} × ${event.gift || 'Regalo'}` : `${event.count} × ${safeType}`;
   eventLog.unshift(event);
   if (eventLog.length > MAX_EVENTS) eventLog.length = MAX_EVENTS;
+  if (safeType === 'gift' && !test) {
+    giftCounter++;
+    persistGiftCounter();
+    broadcast({ type: 'giftCounter', count: giftCounter });
+  }
   broadcast({ type: 'eventLog', event });
   broadcast({ type: 'raceEvent', event });
   return event;
@@ -218,20 +246,34 @@ function scheduleRetry(message) {
 async function connectAttempt(generation) {
   if (generation !== connectionGeneration || !status.username) return;
   setStatus({ state: status.retryCount ? 'retrying' : 'connecting', message: 'Conectando a TikTok…' });
+  const attemptStartedAt = Date.now();
   let conn;
   try {
     conn = new TikTokLiveConnection(status.username, {});
     connection = conn;
     attachTikTokEvents(conn);
-    await conn.connect();
+    const connectionState = await conn.connect();
     if (generation !== connectionGeneration) {
       await conn.disconnect();
       return;
     }
+    const roomId = String(connectionState?.roomId || connectionState?.roomInfo?.roomId || '');
+    if (roomId && roomId !== giftRoomId) {
+      giftRoomId = roomId;
+      giftCounter = 0;
+      persistGiftCounter();
+      broadcast({ type: 'giftCounter', count: giftCounter });
+      recordConnectorLog('info', 'Nueva transmisión detectada; contador de regalos reiniciado.');
+    }
+    recordConnectorLog('info', `LIVE conectado en ${Date.now() - attemptStartedAt} ms; sala ${roomId || 'ID no informado'}.`);
     retryStartedAt = 0;
     setStatus({ state: 'connected', message: 'Conectado', retryCount: 0, nextRetryAt: null });
   } catch (error) {
-    if (generation === connectionGeneration) scheduleRetry(connectionError(error));
+    if (generation === connectionGeneration) {
+      const message = connectionError(error);
+      recordConnectorLog('error', `Intento ${status.retryCount + 1} falló tras ${Date.now() - attemptStartedAt} ms: ${message}`);
+      scheduleRetry(message);
+    }
   }
 }
 
@@ -327,7 +369,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname.startsWith('/api/')) return json(response, 404, { error: 'No encontrado' });
 
   const requested = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
-  if (requested === '.tortugas-config.json') return json(response, 404, { error: 'No encontrado' });
+  if (['.tortugas-config.json', '.tortugas-gift-counter.json'].includes(requested)) return json(response, 404, { error: 'No encontrado' });
   const file = path.resolve(root, requested);
   if (!file.startsWith(`${root}${path.sep}`) && file !== root) return json(response, 403, { error: 'Prohibido' });
   try {
@@ -346,17 +388,20 @@ wss.on('connection', socket => {
   socket.send(JSON.stringify({ type: 'config', config }));
   socket.send(JSON.stringify({ type: 'connection', status }));
   socket.send(JSON.stringify({ type: 'connectorLogs', logs: connectorLogs }));
+  socket.send(JSON.stringify({ type: 'giftCounter', count: giftCounter }));
   socket.on('close', () => sockets.delete(socket));
   socket.on('error', () => sockets.delete(socket));
 });
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Carrera de Tortugas disponible en http://localhost:${port}`);
+  recordConnectorLog('info', `Servidor iniciado; Node ${process.version}, plataforma ${process.platform}.`);
   if (process.env.AUTOCONNECT_TIKTOK !== '0') connectAttempt(connectionGeneration);
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
     await disconnectTikTok();
+    await giftCounterWrite.catch(error => console.error('No se pudo completar el guardado del contador:', error.message));
     server.close(() => process.exit(0));
   });
 }

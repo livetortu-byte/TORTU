@@ -25,6 +25,11 @@
     border-radius:50%;box-shadow:0 0 8px #000;background:#facc15}
   #connectionIndicator[data-state="connected"]{background:#22c55e}
   #connectionIndicator[data-state="failed"]{background:#ef4444}
+  #giftCounter{position:absolute;right:10px;bottom:calc(56px + var(--safe-bottom));z-index:8;min-width:76px;height:76px;padding:0 12px;
+    display:flex;align-items:center;justify-content:center;border:1px solid #ffffff99;border-radius:22px;
+    background:#ffffff26;box-shadow:0 8px 24px #0006,inset 0 1px 0 #ffffff66;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;
+    font:700 clamp(28px,6vw,42px)/1 Arial,Helvetica,sans-serif;text-shadow:0 2px 6px #0008;white-space:nowrap}
 
   /* CABECERA */
   #head{display:flex;height:calc(106px + var(--safe-top));padding-top:var(--safe-top);flex:0 0 auto}
@@ -139,6 +144,7 @@
 <body>
 <div id="app">
   <div id="connectionIndicator" data-state="connecting" role="status" aria-label="Intentando conectar con TikTok" title="Intentando conectar con TikTok"></div>
+  <div id="giftCounter" role="status" aria-label="Regalos en esta transmisión: 0"><span id="giftCounterNumber">0</span></div>
   <div id="head">
     <div class="team">
       <small class="wins" id="wCerro"></small><b class="combo" id="cbCerro"></b>
@@ -783,6 +789,7 @@ addEventListener('storage', e => { if(e.key === CFG_KEY) applyCfg(loadCfg()); })
    (type: like | comment | follow | share | join | gift)                   */
 const qs = new URLSearchParams(location.search);
 const connectionIndicator = document.getElementById('connectionIndicator');
+const giftCounter = document.getElementById('giftCounter');
 function updateConnectionIndicator(state){
   const connected = state === 'connected';
   const failed = state === 'failed' || state === 'disconnected';
@@ -790,6 +797,11 @@ function updateConnectionIndicator(state){
   connectionIndicator.dataset.state = connected ? 'connected' : failed ? 'failed' : 'connecting';
   connectionIndicator.setAttribute('aria-label', label);
   connectionIndicator.title = label;
+}
+function updateGiftCounter(count){
+  const total = Math.max(0, Math.floor(Number(count) || 0));
+  document.getElementById('giftCounterNumber').textContent = String(total);
+  giftCounter.setAttribute('aria-label', `Regalos en esta transmisión: ${total}`);
 }
 if(qs.has('live')){                     // modo directo: sin botones de prueba y con márgenes libres para la interfaz de TikTok
   document.body.classList.add('live');
@@ -807,6 +819,7 @@ if(wsUrl){
       try{
         const d = JSON.parse(e.data);
         if(d.type === 'connection' && d.status) updateConnectionIndicator(d.status.state);
+        else if(d.type === 'giftCounter' && Number.isFinite(Number(d.count))) updateGiftCounter(d.count);
         else if(d.type === 'raceEvent' && d.event) handleEvent(d.event);
         else if(d.type === 'config' && d.config) applyCfg(d.config);
         else if(ACTIONS[d.type] && teams[d.team]) handleEvent(d);
