@@ -53,6 +53,12 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     for (const page of ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/sw.js']) {
       assert.equal((await fetch(base + page)).status, 200, `${page} should be served`);
     }
+    assert.deepEqual(await (await fetch(base + '/api/connector-logs')).json(), []);
+    await post(base, '/api/disconnect', {});
+    const connectorLogs = await (await fetch(base + '/api/connector-logs')).json();
+    assert.ok(connectorLogs.some(log => log.message.toLowerCase().includes('desconectado')));
+    assert.equal((await post(base, '/api/connector-logs/clear', {})).status, 200);
+    assert.deepEqual(await (await fetch(base + '/api/connector-logs')).json(), []);
     assert.equal((await fetch(base + '/api/connect', {
       method:'POST', headers:{'content-type':'application/json'},
       body:JSON.stringify({username:'https://tiktok.com/@bad'})
@@ -63,6 +69,19 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
 
     socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     await once(socket, 'open');
+    const streamedConnectorLog = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Connector log timed out')), 3000);
+      const onMessage = message => {
+        const data = JSON.parse(message.toString());
+        if (data.type !== 'connectorLog') return;
+        clearTimeout(timeout);
+        socket.off('message', onMessage);
+        resolve(data.log);
+      };
+      socket.on('message', onMessage);
+    });
+    await post(base, '/api/disconnect', {});
+    assert.match((await streamedConnectorLog).message, /desconectado/i);
     async function sendAndCheck(input, expectedTeam, expectedType) {
       let messages;
       const received = new Promise((resolve, reject) => {

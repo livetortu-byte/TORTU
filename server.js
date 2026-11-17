@@ -11,6 +11,7 @@ const configPath = process.env.CONFIG_PATH || path.join(root, '.tortugas-config.
 const RETRY_MS = 5000;
 const RETRY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_EVENTS = 500;
+const MAX_CONNECTOR_LOGS = 500;
 const defaultConfig = {
   on: true, show: 5, gifts: ['rose', 'donut', 'heart', 'confetti', 'corgi', 'lion', 'galaxy', 'ice', 'rocket', 'diamond', 'crown', 'car', 'fireworks', 'music', 'star'],
   lanes: { cerro: true, oli: true },
@@ -36,6 +37,7 @@ let retryStartedAt = 0;
 let assignmentIndex = 0;
 const userTeams = new Map();
 const eventLog = [];
+const connectorLogs = [];
 const sockets = new Set();
 
 function broadcast(payload) {
@@ -47,6 +49,9 @@ function broadcast(payload) {
 
 function setStatus(next) {
   status = { ...status, ...next };
+  const level = status.state === 'failed' ? 'error' : status.state === 'retrying' ? 'warn' : 'info';
+  const username = status.username ? ` @${status.username}` : '';
+  recordConnectorLog(level, `${status.state}${username} — ${status.message || ''}`);
   broadcast({ type: 'connection', status });
 }
 
@@ -54,11 +59,30 @@ function safeText(value, max = 500) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
 }
 
+function safeConnectorText(value, max = 500) {
+  const redacted = String(value ?? '')
+    .replace(/https?:\/\/[^\s"'<>]+/gi, '[URL omitida]')
+    .replace(/\b(msToken|signature|sig|sessionid|session_id|token|key)=([^&\s]+)/gi, '$1=[oculto]');
+  return safeText(redacted, max);
+}
+
+function recordConnectorLog(level, message) {
+  const log = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: new Date().toISOString(),
+    level,
+    message: safeConnectorText(message)
+  };
+  connectorLogs.unshift(log);
+  if (connectorLogs.length > MAX_CONNECTOR_LOGS) connectorLogs.length = MAX_CONNECTOR_LOGS;
+  broadcast({ type: 'connectorLog', log });
+}
+
 function connectionError(error) {
   const exception = error?.exception;
   const statusCode = exception?.response?.status || exception?.status;
   if (statusCode) return `TikTok respondió con HTTP ${statusCode}`;
-  return safeText(exception?.message || error?.info || error?.message || 'Error de conexión', 180);
+  return safeConnectorText(exception?.message || error?.info || error?.message || 'Error de conexión', 180);
 }
 
 function normalizeTeam(text) {
@@ -239,6 +263,12 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (url.pathname === '/api/status' && request.method === 'GET') return json(response, 200, status);
   if (url.pathname === '/api/config' && request.method === 'GET') return json(response, 200, config);
+  if (url.pathname === '/api/connector-logs' && request.method === 'GET') return json(response, 200, connectorLogs);
+  if (url.pathname === '/api/connector-logs/clear' && request.method === 'POST') {
+    connectorLogs.length = 0;
+    broadcast({ type: 'connectorLogsCleared' });
+    return json(response, 200, { cleared: true });
+  }
   if (url.pathname === '/api/events' && request.method === 'GET') {
     const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit')) || 100));
     return json(response, 200, eventLog.slice(0, limit));
@@ -315,6 +345,7 @@ wss.on('connection', socket => {
   sockets.add(socket);
   socket.send(JSON.stringify({ type: 'config', config }));
   socket.send(JSON.stringify({ type: 'connection', status }));
+  socket.send(JSON.stringify({ type: 'connectorLogs', logs: connectorLogs }));
   socket.on('close', () => sockets.delete(socket));
   socket.on('error', () => sockets.delete(socket));
 });

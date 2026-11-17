@@ -7,7 +7,7 @@
 <style>
   :root{--bg:#0b1117;--card:#16212b;--line:#2b3a47;--tx:#f1f5f9;--mut:#94a3b8;--ok:#16a34a;--acc:#d97706}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--tx);font-family:Arial,Helvetica,sans-serif;padding:16px;max-width:760px;margin:0 auto}
+  body{background:var(--bg);color:var(--tx);font-family:Arial,Helvetica,sans-serif;padding:16px;max-width:1240px;margin:0 auto}
   h1{font-size:22px;margin-bottom:4px} p.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
   a{color:#60a5fa}
   section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
@@ -16,7 +16,7 @@
   .row:first-of-type{border-top:0}
   label.sw{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
   input[type=checkbox]{width:20px;height:20px;accent-color:var(--ok)}
-  input[type=number],input[type=text],select{background:#0b1117;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:15px;width:84px}
+  input[type=number],input[type=text],input[type=search],select{background:#0b1117;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:15px;width:84px}
   select{width:auto}
   button{font:inherit;font-size:13px;color:#fff;background:#334155;border:0;border-radius:18px;padding:7px 14px;cursor:pointer}
   button.pri{background:var(--acc)}
@@ -31,16 +31,32 @@
   .note{color:var(--mut);font-size:12px;margin-top:8px}
   #connectionState{font-weight:bold}#connectionState.connected{color:#22c55e}#connectionState.retrying,#connectionState.connecting{color:#facc15}#connectionState.failed{color:#ef4444}
   #feedback{font-size:12px;color:var(--mut)}input[type=text].username{width:min(270px,100%)}
+  .dashboard-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:14px;align-items:start}
+  .dashboard-layout.logs-hidden{grid-template-columns:1fr}
+  #dashboardMain{min-width:0}
+  #connectorLogPanel{position:sticky;top:14px;min-width:0}
+  #connectorLogPanel h2{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .log-toolbar{display:grid;gap:8px;margin-bottom:8px}
+  #connectorLogFilter{width:100%}
+  #connectorLogEntries{height:min(68vh,720px);overflow:auto;border-top:1px solid var(--line)}
+  .connector-log{padding:9px 2px;border-bottom:1px solid var(--line);font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+  .connector-log-meta{display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:11px;margin-bottom:3px}
+  .connector-log.error .connector-log-level{color:#f87171}
+  .connector-log.warn .connector-log-level{color:#facc15}
+  #connectorLogFeedback{min-height:16px;color:var(--mut);font-size:12px}
+  @media(max-width:900px){.dashboard-layout{grid-template-columns:1fr}#connectorLogPanel{position:static}#connectorLogEntries{height:320px}}
 </style>
 </head>
 <body>
 <h1>⚙ Panel de la carrera</h1>
 <p class="sub">Los cambios se guardan solos y se aplican al instante. <a href="index.html?live=1" target="_blank">Abrir overlay</a> · <a href="events.html" target="_blank">Ver registro de eventos</a> · <span id="saved">✔ guardado</span></p>
 
+<div class="dashboard-layout" id="dashboardLayout">
+<main id="dashboardMain">
 <section>
   <h2>📡 Conexión con TikTok LIVE</h2>
   <div class="row"><label for="username">Usuario del creador (con o sin @)</label><input id="username" class="username" type="text" autocomplete="off" placeholder="usuario_tiktok"></div>
-  <div class="row"><span id="connectionState">Desconectado</span><span class="tools"><button id="connect" class="pri">Conectar</button><button id="disconnect">Desconectar</button></span></div>
+  <div class="row"><span id="connectionState">Desconectado</span><span class="tools"><button id="connect" class="pri">Conectar</button><button id="disconnect">Desconectar</button><button id="toggleConnectorLogs" type="button" aria-expanded="true">📋 Ocultar logs</button></span></div>
   <p class="note" id="connectionNote">Se reintenta cada 5 segundos durante un máximo de 5 minutos. El usuario debe estar transmitiendo en LIVE.</p>
   <p class="note">La conexión usa el conector comunitario de TikTok LIVE. No ingreses contraseña ni cookies de TikTok.</p>
 </section>
@@ -95,6 +111,19 @@
     <span>Ritmo <select id="rate"><option>30</option><option>60</option><option>90</option></select> por minuto</span></div>
   <p class="note">Apagado por defecto. Con <code>?ws=</code> el bot nunca arranca.</p>
 </section>
+</main>
+
+<aside id="connectorLogPanel" aria-label="Registro del conector TikTok">
+  <h2>📋 Log del conector</h2>
+  <div class="log-toolbar">
+    <input id="connectorLogFilter" type="search" placeholder="Filtrar por estado, usuario o error" aria-label="Filtrar logs del conector">
+    <span class="tools"><button id="copyConnectorLogs">Copiar</button><button id="clearConnectorLogs">Limpiar registro</button></span>
+    <span id="connectorLogFeedback" role="status"></span>
+  </div>
+  <div id="connectorLogEntries" aria-live="polite"></div>
+  <p class="note">Se muestran los últimos 500 cambios de conexión. Los enlaces y tokens se ocultan del registro.</p>
+</aside>
+</div>
 
 <script>
 const KEY = 'tortugas.cfg';
@@ -231,6 +260,88 @@ function connectStatus(){
   socket.onclose = () => setTimeout(connectStatus, 2000);
 }
 connectStatus();
+
+let connectorLogItems = [];
+function filteredConnectorLogs(){
+  const query = $('connectorLogFilter').value.trim().toLocaleLowerCase();
+  return connectorLogItems.filter(log => !query || `${log.level} ${log.message} ${log.timestamp}`.toLocaleLowerCase().includes(query));
+}
+function renderConnectorLogs(){
+  const entries = $('connectorLogEntries');
+  const logs = filteredConnectorLogs();
+  entries.replaceChildren();
+  if(!logs.length){
+    const empty = document.createElement('p');
+    empty.className = 'note';
+    empty.textContent = connectorLogItems.length ? 'No hay registros que coincidan con el filtro.' : 'Todavía no hay registros de conexión.';
+    entries.append(empty);
+    return;
+  }
+  logs.forEach(log => {
+    const item = document.createElement('div');
+    item.className = `connector-log ${log.level}`;
+    const meta = document.createElement('div');
+    meta.className = 'connector-log-meta';
+    const level = document.createElement('span');
+    level.className = 'connector-log-level';
+    level.textContent = String(log.level || 'info').toUpperCase();
+    const time = document.createElement('time');
+    time.dateTime = log.timestamp;
+    time.textContent = new Date(log.timestamp).toLocaleString();
+    const message = document.createElement('div');
+    message.textContent = log.message;
+    meta.append(level, time);
+    item.append(meta, message);
+    entries.append(item);
+  });
+}
+function addConnectorLog(log){
+  if(!log || !log.id) return;
+  connectorLogItems = [log, ...connectorLogItems.filter(item => item.id !== log.id)].slice(0, 500);
+  renderConnectorLogs();
+}
+$('connectorLogFilter').oninput = renderConnectorLogs;
+$('toggleConnectorLogs').onclick = () => {
+  const hidden = !$('connectorLogPanel').hidden;
+  $('connectorLogPanel').hidden = hidden;
+  $('dashboardLayout').classList.toggle('logs-hidden', hidden);
+  $('toggleConnectorLogs').setAttribute('aria-expanded', String(!hidden));
+  $('toggleConnectorLogs').textContent = hidden ? '📋 Mostrar logs' : '📋 Ocultar logs';
+};
+$('copyConnectorLogs').onclick = async () => {
+  const text = filteredConnectorLogs().map(log => `${log.timestamp} [${String(log.level).toUpperCase()}] ${log.message}`).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    $('connectorLogFeedback').textContent = 'Registro copiado.';
+  } catch(error) { $('connectorLogFeedback').textContent = `No se pudo copiar: ${error.message}`; }
+};
+$('clearConnectorLogs').onclick = async () => {
+  if(!confirm('¿Limpiar el registro del conector?')) return;
+  try {
+    const response = await fetch('/api/connector-logs/clear', {method:'POST'});
+    if(!response.ok) throw new Error('No se pudo limpiar el registro.');
+    connectorLogItems = [];
+    renderConnectorLogs();
+    $('connectorLogFeedback').textContent = 'Registro limpiado.';
+  } catch(error) { $('connectorLogFeedback').textContent = error.message; }
+};
+fetch('/api/connector-logs').then(response => {
+  if(!response.ok) throw new Error('No se pudieron cargar los registros del conector.');
+  return response.json();
+}).then(logs => { connectorLogItems = logs; renderConnectorLogs(); })
+  .catch(error => { $('connectorLogFeedback').textContent = error.message; });
+
+statusSocket.addEventListener('message', message => {
+  const data = JSON.parse(message.data);
+  if(data.type === 'connectorLogs' && Array.isArray(data.logs)){
+    connectorLogItems = data.logs;
+    renderConnectorLogs();
+  } else if(data.type === 'connectorLog') addConnectorLog(data.log);
+  else if(data.type === 'connectorLogsCleared'){
+    connectorLogItems = [];
+    renderConnectorLogs();
+  }
+});
 </script>
 </body>
 </html>
