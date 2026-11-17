@@ -21,15 +21,10 @@
   body.live{--safe-top:64px;--safe-bottom:120px}   /* ?live=1: deja libre lo que tapa la interfaz de TikTok (arriba: perfil; abajo: chat) */
   #app{position:relative;height:100%;width:min(100vw,calc(100vh * 9 / 16));margin:0 auto;display:flex;flex-direction:column;
     padding-bottom:var(--safe-bottom)}
-  #connectionIndicator{position:absolute;left:8px;bottom:8px;z-index:11;width:14px;height:14px;border:2px solid #fff;
+  #connectionIndicator{position:absolute;left:8px;bottom:calc(8px + var(--safe-bottom));z-index:11;width:14px;height:14px;border:2px solid #fff;
     border-radius:50%;box-shadow:0 0 8px #000;background:#facc15}
   #connectionIndicator[data-state="connected"]{background:#22c55e}
   #connectionIndicator[data-state="failed"]{background:#ef4444}
-  #giftCounter{position:absolute;right:10px;bottom:calc(56px + var(--safe-bottom));z-index:8;min-width:76px;height:76px;padding:0 12px;
-    display:flex;align-items:center;justify-content:center;border:1px solid #ffffff99;border-radius:22px;
-    background:#ffffff26;box-shadow:0 8px 24px #0006,inset 0 1px 0 #ffffff66;
-    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;
-    font:700 clamp(28px,6vw,42px)/1 Arial,Helvetica,sans-serif;text-shadow:0 2px 6px #0008;white-space:nowrap}
 
   /* CABECERA */
   #head{display:flex;height:calc(106px + var(--safe-top));padding-top:var(--safe-top);flex:0 0 auto}
@@ -93,8 +88,11 @@
   .mflag.oli{background:repeating-linear-gradient(90deg,var(--oli) 0 3px,var(--oli2) 3px 6px)}
 
   /* BARRA INFERIOR: bot + regalo de prueba */
-  #bar{flex:0 0 auto;height:46px;display:flex;align-items:center;justify-content:center;gap:6px;background:#000}
+  #bar{flex:0 0 auto;height:46px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0 12px;background:#000}
+  body.live #bar{background:transparent;pointer-events:none}
   #bar button{font-family:inherit;font-size:12px;color:#fff;border:3px solid #fff;border-radius:22px;padding:5px 10px;white-space:nowrap}
+  #giftCounter{display:flex;align-items:center;justify-content:flex-end;min-width:44px;color:#fff;
+    font:700 clamp(24px,5vw,34px)/1 Arial,Helvetica,sans-serif;text-shadow:0 2px 6px #000;white-space:nowrap}
   #botBtn{background:#16a34a}
   #botBtn.off{background:#6b7280}
   #giftBtn{background:#d97706}
@@ -144,7 +142,6 @@
 <body>
 <div id="app">
   <div id="connectionIndicator" data-state="connecting" role="status" aria-label="Intentando conectar con TikTok" title="Intentando conectar con TikTok"></div>
-  <div id="giftCounter" role="status" aria-label="Regalos en esta transmisión: 0"><span id="giftCounterNumber">0</span></div>
   <div id="head">
     <div class="team">
       <small class="wins" id="wCerro"></small><b class="combo" id="cbCerro"></b>
@@ -167,7 +164,7 @@
     <div id="winner"><div id="wtext"></div></div>
   </div>
 
-  <a id="bar" href="dashboard.html" aria-label="Panel"></a>
+  <a id="bar" href="dashboard.html" aria-label="Panel"><span id="giftCounter" role="status" aria-label="Regalos en esta transmisión: 0"><span id="giftCounterNumber">0</span></span></a>
 </div>
 
 <script>
@@ -805,7 +802,6 @@ function updateGiftCounter(count){
 }
 if(qs.has('live')){                     // modo directo: sin botones de prueba y con márgenes libres para la interfaz de TikTok
   document.body.classList.add('live');
-  document.getElementById('bar').style.display = 'none';
 }
 const wsUrl = qs.get('ws') || (location.protocol === 'http:' || location.protocol === 'https:'
   ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'
