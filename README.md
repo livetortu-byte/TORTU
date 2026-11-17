@@ -1,56 +1,34 @@
-# Tortulive
+# Carrera de Tortugas LIVE
 
-MVP multi-tenant Node service with a separately hostable static PWA overlay.
-Requires Node.js 22.5 or newer (uses the built-in `node:sqlite` module).
+## Ejecutar localmente
 
-## Run locally
-
-From the project root, run `npm start` for the combined web and API server, then open `http://localhost:8080/dashboard.html`.
-
-## Deploy on EasyPanel
-
-Create a service from this repository using the **Dockerfile** build method. The app listens on port `8080`; set the service's internal port to `8080` and attach a persistent volume at `/data`. The image stores SQLite at `/data/tortulive.sqlite` by default, so keep that volume when redeploying or restarting the service.
-
-Use the combined server (`npm start`) as one EasyPanel service. Enable HTTPS and set `COOKIE_SECURE=true` in the service environment. Run only one app instance because SQLite and the live event stream are local to that instance. Back up the `/data` volume regularly.
-
-## Run as two independent services
-
-Start each command in its own terminal/process from the project root.
-
-PowerShell:
+Requiere Node.js 20 o posterior.
 
 ```powershell
-$env:API_PORT = "8081"
-$env:API_ALLOWED_ORIGINS = "http://localhost:8082"
-npm.cmd run start:api
+npm install
+npm start
 ```
 
-In another terminal:
+Abre `http://localhost:3000/dashboard.html`. El panel no necesita token; expón el puerto indicado por `PORT` (3000 por defecto) para el despliegue.
+
+## Desplegar en EasyPanel
+
+Despliega desde este repositorio usando el `Dockerfile` y configura el puerto interno `3000`. Activa HTTPS para poder instalar la PWA y solicitar el bloqueo de suspensión en móviles. Monta un volumen persistente en `/data` para conservar la configuración del panel después de un redeploy.
+
+En el panel:
+
+- Ingresa el usuario de TikTok LIVE sin contraseña ni cookies.
+- Abre **Registro de eventos** para revisar avatar, apodo, tipo y contenido.
+- Abre el overlay con **Abrir overlay**. Instálalo como PWA desde el navegador del teléfono y toca la pantalla una vez para activar pantalla completa y el bloqueo de suspensión cuando el navegador lo permita.
+- Los comentarios que mencionen Cerro/Cerrista u Olimpia/Olimpista, incluso dentro de una frase, eligen el equipo del comentarista. Si cambia de equipo en otro comentario, también cambia su asignación.
+- Usa **Probar evento completo** para verificar comentarios, cambio de equipo, metros y regalos configurados sin una transmisión activa.
+
+El despliegue PWA y el bloqueo de pantalla requieren HTTPS en dispositivos móviles. El sistema operativo o el navegador todavía pueden suspender la pantalla; la aplicación vuelve a solicitar Wake Lock al regresar a primer plano.
+
+El conector de TikTok LIVE es comunitario, no oficial, y requiere que el usuario ingresado esté transmitiendo. No necesita token de conexión de TikTok. Los controles del servidor no tienen autenticación, así que cualquiera con acceso a su URL puede cambiar la configuración y enviar eventos de prueba. Los eventos se conservan en memoria hasta reiniciar el servidor; la configuración del panel sí se guarda en `.tortugas-config.json`.
+
+## Pruebas
 
 ```powershell
-$env:WEB_PORT = "8082"
-npm.cmd run start:web
+npm test
 ```
-
-Edit `webserver/api-config.js` for a static web host and set:
-
-```js
-window.TORTULIVE_API_BASE_URL = 'https://api.example.com';
-```
-
-Use the public web origin in `API_ALLOWED_ORIGINS`, for example `https://app.example.com`. Values are exact origins (scheme, host, and optional port), separated by commas. The API allows credentialed CORS only for these configured origins. The frontend calls the API with credentials so account-session cookies work; use HTTPS in production and configure `COOKIE_SECURE=true`. Keep the web and API on the same site where possible (for example `app.example.com` and `api.example.com`) to avoid browser third-party-cookie restrictions. `COOKIE_SAME_SITE=None` requires Secure cookies and HTTPS.
-
-Each independently deployed service needs access to the project code. Only the API process opens the SQLite database. Set `DB_PATH` to durable storage on the API host; do not put the database in the static web root or share one SQLite file across multiple API hosts. This deployment supports one API instance; horizontal scaling needs a shared database and shared event pub/sub.
-
-## Services
-
-- `npm start`: combined web + API, `PORT` (default 8080).
-- `npm run start:web`: static web/PWA only, `WEB_PORT` (default 8080).
-- `npm run start:api`: API only, `API_PORT` (default 8080).
-- `npm run check`: syntax checks.
-
-The web PWA and dashboard are served from `webserver/`. The public OBS URL is `/overlay/<publicId>`. The private event-ingest credential is only for the backend and must never be embedded in the public overlay or designer HTML.
-
-## Current product boundary
-
-Accounts, per-account overlay ownership, event credentials, event persistence/deduplication, SSE delivery, team assignment, race meters, and winner calculation are implemented. Selected TikTok profiles connect through the community-maintained, unofficial `tiktok-live-connector`; the dashboard shows connection state, retries every five seconds for up to five minutes, and allows reconnecting after expiration. The connector may break when TikTok changes its service and may use a third-party signing service; don't provide TikTok passwords or cookies. Turbo and gift-class speed rules remain undefined. See `webserver\CONTRATO.md` for the single contract and the remaining project checklist.

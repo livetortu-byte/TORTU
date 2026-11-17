@@ -1,0 +1,9 @@
+{
+  "name": "Carrera de Tortugas LIVE",
+  "short_name": "Tortugas LIVE",
+  "start_url": "/?live=1",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#101820",
+  "theme_color": "#101820"
+}

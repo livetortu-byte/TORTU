@@ -1,5 +1,8 @@
 node_modules/
-data/
+**/node_modules/
+.tortugas-config.json
 .env
 .env.*
 !.env.example
+npm-debug.log*
+files*.zip

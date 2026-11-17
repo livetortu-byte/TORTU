@@ -1,8 +1,5 @@
-.git
-.github
 node_modules
-data
-.env
-.env.*
-!.env.example
-npm-debug.log*
+.git
+.tortugas-config.json
+files*.zip
+*.log

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel · Carrera de Tortugas</title>
+<style>
+  :root{--bg:#0b1117;--card:#16212b;--line:#2b3a47;--tx:#f1f5f9;--mut:#94a3b8;--ok:#16a34a;--acc:#d97706}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font-family:Arial,Helvetica,sans-serif;padding:16px;max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px} p.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+  a{color:#60a5fa}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  h2{font-size:15px;margin-bottom:10px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+  .row:first-of-type{border-top:0}
+  label.sw{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
+  input[type=checkbox]{width:20px;height:20px;accent-color:var(--ok)}
+  input[type=number],input[type=text],select{background:#0b1117;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:15px;width:84px}
+  select{width:auto}
+  button{font:inherit;font-size:13px;color:#fff;background:#334155;border:0;border-radius:18px;padding:7px 14px;cursor:pointer}
+  button.pri{background:var(--acc)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:8px}
+  .gift{display:flex;flex-direction:column;align-items:center;gap:4px;background:#0b1117;border:2px solid var(--line);border-radius:12px;padding:10px 4px;cursor:pointer;user-select:none}
+  .gift.on{border-color:var(--ok);background:#10281a}
+  .gift .e{font-size:38px;line-height:1.1}
+  .gift .n{font-size:12px;color:var(--mut)}
+  .gift label{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+  .tools{display:flex;gap:8px;flex-wrap:wrap}
+  #saved{color:var(--ok);font-size:12px;opacity:0;transition:.3s} #saved.show{opacity:1}
+  .note{color:var(--mut);font-size:12px;margin-top:8px}
+  #connectionState{font-weight:bold}#connectionState.connected{color:#22c55e}#connectionState.retrying,#connectionState.connecting{color:#facc15}#connectionState.failed{color:#ef4444}
+  #feedback{font-size:12px;color:var(--mut)}input[type=text].username{width:min(270px,100%)}
+</style>
+</head>
+<body>
+<h1>⚙ Panel de la carrera</h1>
+<p class="sub">Los cambios se guardan solos y se aplican al instante. <a href="index.html?live=1" target="_blank">Abrir overlay</a> · <a href="events.html" target="_blank">Ver registro de eventos</a> · <span id="saved">✔ guardado</span></p>
+
+<section>
+  <h2>📡 Conexión con TikTok LIVE</h2>
+  <div class="row"><label for="username">Usuario del creador (con o sin @)</label><input id="username" class="username" type="text" autocomplete="off" placeholder="usuario_tiktok"></div>
+  <div class="row"><span id="connectionState">Desconectado</span><span class="tools"><button id="connect" class="pri">Conectar</button><button id="disconnect">Desconectar</button></span></div>
+  <p class="note" id="connectionNote">Se reintenta cada 5 segundos durante un máximo de 5 minutos. El usuario debe estar transmitiendo en LIVE.</p>
+  <p class="note">La conexión usa el conector comunitario de TikTok LIVE. No ingreses contraseña ni cookies de TikTok.</p>
+</section>
+
+<section>
+  <h2>🧪 Probar evento completo</h2>
+  <div class="row"><label for="testType">Tipo de evento</label><select id="testType"><option value="comment">Comentario</option><option value="like">Like</option><option value="follow">Seguir</option><option value="share">Compartir</option><option value="join">Unirse</option><option value="gift">Regalo</option></select></div>
+  <div class="row"><label for="testTeam">Equipo</label><select id="testTeam"><option value="auto">Detectar por comentario</option><option value="cerro">Cerro</option><option value="oli">Olimpia</option></select></div>
+  <div class="row"><label for="testComment">Texto de comentario (solo comentario)</label><input id="testComment" class="username" type="text" value="¡Vamos Cerro!"></div>
+  <div class="row"><button id="sendTest" class="pri">Enviar evento de prueba</button><span id="feedback" role="status"></span></div>
+  <p class="note">El evento se registra en la página de eventos y se envía al overlay: alerta, avatar, avance según los metros configurados o animación del regalo seleccionado.</p>
+</section>
+
+<section>
+  <h2>🎁 Regalos de los usuarios</h2>
+  <div class="row"><label class="sw"><input type="checkbox" id="on"> Mostrar el regalo y el avatar de quien lo envía</label></div>
+  <div class="row"><span>Tiempo del regalo en pantalla</span><span><input type="number" id="show" min="1" step="1"> segundos</span></div>
+  <div class="row"><span>Mostrar en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
+  <div class="row"><span>Mostrar en vía Olimpia</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_oli"> ON</label><button class="pri" data-test="oli">Probar regalo</button></span></div>
+  <p class="note">Los regalos los envían los usuarios (no hay regalo automático). Aquí eliges qué se muestra y cuánto tiempo (5 s por defecto). El efecto de la tortuga gigante ocurre siempre.</p>
+</section>
+
+<section>
+  <h2>🖼 Galería de regalos <span style="color:var(--mut);font-weight:normal" id="count"></span></h2>
+  <div class="tools"><button id="all">Marcar todos</button><button id="none">Quitar todos</button></div>
+  <div class="grid" id="grid"></div>
+  <p class="note">Solo se muestran los regalos marcados cuando un usuario los envía. Sin ninguno marcado no se muestra ningún regalo.</p>
+</section>
+
+<section>
+  <h2>📏 Metros por evento</h2>
+  <div class="row"><span>👍 Tap / like</span><span><input type="number" data-m="like"> m</span></div>
+  <div class="row"><span>💬 Comentario</span><span><input type="number" data-m="comment"> m</span></div>
+  <div class="row"><span>↗ Compartir</span><span><input type="number" data-m="share"> m</span></div>
+  <div class="row"><span>➕ Seguir</span><span><input type="number" data-m="follow"> m</span></div>
+  <div class="row"><span>🏁 Unirse al equipo</span><span><input type="number" data-m="join"> m</span></div>
+  <div class="row"><span class="note">Meta: 100 m. El regalo no suma metros (tortuga ×3 y camina sola).</span><button id="mdef">Restaurar</button></div>
+  <p class="note">El combo, la remontada y la inactividad se aplican encima de estos metros.</p>
+</section>
+
+<section>
+  <h2>🔊 Sonido y voz en off</h2>
+  <div class="row"><label class="sw"><input type="checkbox" id="sound"> Efectos de sonido (acciones, combo, hitos, victoria)</label></div>
+  <div class="row"><label class="sw"><input type="checkbox" id="voice"> Voz alegre que lee los comentarios y agradece regalos</label></div>
+  <div class="row"><span>Volumen <b id="volv"></b></span><input type="range" id="vol" min="0" max="100" step="5" style="width:55%"></div>
+  <p class="note">En la carrera hay que tocar la pantalla una vez para que el navegador permita el audio.</p>
+</section>
+
+<section>
+  <h2>🤖 Bot de pruebas</h2>
+  <div class="row"><label class="sw"><input type="checkbox" id="bot"> Bot activo (eventos falsos)</label>
+    <span>Ritmo <select id="rate"><option>30</option><option>60</option><option>90</option></select> por minuto</span></div>
+  <p class="note">Apagado por defecto. Con <code>?ws=</code> el bot nunca arranca.</p>
+</section>
+
+<script>
+const KEY = 'tortugas.cfg';
+// mismas claves y orden que GIFTS en index.html
+const GIFTS = [
+  ['rose','🌹','Rosa'],['donut','🍩','Dona'],['heart','💖','Corazón'],['confetti','🎉','Confeti'],['corgi','🐶','Corgi'],
+  ['lion','🦁','León'],['galaxy','🌌','Galaxia'],['ice','🍦','Helado'],['rocket','🚀','Cohete'],['diamond','💎','Diamante'],
+  ['crown','👑','Corona'],['car','🏎️','Auto'],['fireworks','🎆','Fuegos'],['music','🎵','Música'],['star','⭐','Estrella']
+];
+const DEFM = {like:3, comment:1, share:5, follow:10, join:2};
+const DEF = {on:true, meters:DEFM, show:5, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
+let cfg;
+try{ cfg = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }catch(_){ cfg = Object.assign({}, DEF); }
+cfg.lanes = Object.assign({}, DEF.lanes, cfg.lanes);
+cfg.meters = Object.assign({}, DEFM, cfg.meters);
+const $ = id => document.getElementById(id);
+let tm;
+function save(extra){
+  Object.assign(cfg, extra || {});
+  try{ localStorage.setItem(KEY, JSON.stringify(cfg)); }catch(_){}
+  fetch('/api/config', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(cfg)})
+    .then(response => { if(!response.ok) throw new Error('No se pudo guardar la configuración en el servidor.'); })
+    .catch(error => { $('feedback').textContent = error.message; });
+  $('saved').classList.add('show'); clearTimeout(tm); tm = setTimeout(() => $('saved').classList.remove('show'), 1200);
+}
+function drawGrid(){
+  $('grid').innerHTML = '';
+  GIFTS.forEach(([k, e, n]) => {
+    const on = cfg.gifts.includes(k), d = document.createElement('div');
+    d.className = 'gift' + (on ? ' on' : '');
+    d.innerHTML = `<span class="e">${e}</span><span class="n">${n}</span><label><input type="checkbox" ${on ? 'checked' : ''}> mostrar</label>`;
+    d.onclick = ev => {
+      if(ev.target.tagName !== 'INPUT') d.querySelector('input').checked = !d.querySelector('input').checked;
+      const sel = new Set(cfg.gifts); d.querySelector('input').checked ? sel.add(k) : sel.delete(k);
+      d.classList.toggle('on', sel.has(k));
+      save({gifts:GIFTS.map(g => g[0]).filter(x => sel.has(x))}); $('count').textContent = '(' + cfg.gifts.length + ' de ' + GIFTS.length + ')';
+    };
+    $('grid').appendChild(d);
+  });
+  $('count').textContent = '(' + cfg.gifts.length + ' de ' + GIFTS.length + ')';
+}
+$('on').checked = cfg.on; $('on').onchange = e => save({on:e.target.checked});
+$('show').value = cfg.show; $('show').onchange = e => save({show:Math.max(1, Math.round(+e.target.value) || 5)});
+for(const k of ['cerro', 'oli']){
+  $('lane_' + k).checked = cfg.lanes[k];
+  $('lane_' + k).onchange = e => save({lanes:Object.assign({}, cfg.lanes, {[k]:e.target.checked})});
+}
+document.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => {
+  try {
+    const event = await request('/api/test-event', {type:'gift', team:b.dataset.test, user:'usuario_prueba', nickname:'Usuario de prueba'});
+    $('feedback').textContent = `Regalo de prueba ${event.gift} enviado al registro y al overlay.`;
+  } catch(error) { $('feedback').textContent = error.message; }
+});
+$('all').onclick = () => { save({gifts:GIFTS.map(g => g[0])}); drawGrid(); };
+$('none').onclick = () => { save({gifts:[]}); drawGrid(); };
+function drawM(){ document.querySelectorAll('[data-m]').forEach(i => i.value = cfg.meters[i.dataset.m]); }
+document.querySelectorAll('[data-m]').forEach(i => { i.min = 0; i.max = 100; i.step = 0.5; i.onchange = e => {
+  const v = Math.max(0, Math.min(100, +e.target.value || 0)); e.target.value = v;
+  save({meters:Object.assign({}, cfg.meters, {[i.dataset.m]:v})}); }; });
+$('mdef').onclick = () => { save({meters:Object.assign({}, DEFM)}); drawM(); };
+drawM();
+$('sound').checked = cfg.sound; $('sound').onchange = e => save({sound:e.target.checked});
+$('voice').checked = cfg.voice; $('voice').onchange = e => save({voice:e.target.checked});
+$('vol').value = cfg.vol; $('volv').textContent = cfg.vol + '%';
+$('vol').oninput = e => { $('volv').textContent = e.target.value + '%'; save({vol:+e.target.value}); };
+$('bot').checked = cfg.bot; $('bot').onchange = e => save({bot:e.target.checked});
+$('rate').value = cfg.rate; $('rate').onchange = e => save({rate:+e.target.value});
+addEventListener('storage', e => {          // si cambia desde la carrera (botón ON de una vía), refleja el cambio aquí
+  if(e.key !== KEY) return;
+  try{ const c = JSON.parse(e.newValue || '{}'); if(c.lanes){ cfg.lanes = c.lanes; $('lane_cerro').checked = c.lanes.cerro !== false; $('lane_oli').checked = c.lanes.oli !== false; } }catch(_){}
+});
+drawGrid();
+
+function showConnection(status){
+  const state = $('connectionState');
+  state.className = status.state || 'disconnected';
+  state.textContent = status.state === 'connected' ? '🟢 Conectado' :
+    status.state === 'retrying' ? `🟡 Reintentando (${status.retryCount || 0}) · próximo intento en 5 s` :
+    status.state === 'connecting' ? '🟡 Conectando…' :
+    status.state === 'failed' ? '🔴 Falló · se agotaron los 5 minutos' : 'Desconectado';
+  $('connectionNote').textContent = status.message || 'Esperando conexión.';
+  if(status.username) $('username').value = status.username;
+}
+async function request(path, data){
+  const response = await fetch(path, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(data || {})});
+  const result = await response.json();
+  if(!response.ok) throw new Error(result.error || 'La solicitud falló.');
+  return result;
+}
+$('connect').onclick = async () => {
+  $('feedback').textContent = '';
+  try { showConnection(await request('/api/connect', {username:$('username').value})); }
+  catch(error) { $('feedback').textContent = error.message; }
+};
+$('disconnect').onclick = async () => {
+  try { showConnection(await request('/api/disconnect')); }
+  catch(error) { $('feedback').textContent = error.message; }
+};
+$('sendTest').onclick = async () => {
+  $('feedback').textContent = 'Enviando…';
+  try {
+    const event = await request('/api/test-event', {
+      type:$('testType').value, team:$('testTeam').value, text:$('testComment').value,
+      user:'usuario_prueba', nickname:'Usuario de prueba'
+    });
+    $('feedback').textContent = `Evento ${event.type} enviado al registro y al overlay.`;
+  } catch(error) { $('feedback').textContent = error.message; }
+};
+fetch('/api/config').then(response => response.ok ? response.json() : null).then(serverCfg => {
+  if(!serverCfg) return;
+  cfg = Object.assign({}, DEF, serverCfg);
+  cfg.lanes = Object.assign({}, DEF.lanes, cfg.lanes);
+  cfg.meters = Object.assign({}, DEFM, cfg.meters);
+  localStorage.setItem(KEY, JSON.stringify(cfg));
+  $('on').checked = cfg.on; $('show').value = cfg.show;
+  for(const k of ['cerro','oli']) $('lane_' + k).checked = cfg.lanes[k] !== false;
+  drawGrid(); drawM();
+  $('sound').checked = cfg.sound; $('voice').checked = cfg.voice;
+  $('vol').value = cfg.vol; $('volv').textContent = cfg.vol + '%';
+  $('bot').checked = cfg.bot; $('rate').value = cfg.rate;
+}).catch(error => { $('feedback').textContent = error.message; });
+fetch('/api/status').then(response => response.json()).then(showConnection).catch(error => { $('feedback').textContent = error.message; });
+let statusSocket;
+function connectStatus(){
+  const socket = statusSocket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  socket.onmessage = message => {
+    const data = JSON.parse(message.data);
+    if(data.type === 'connection') showConnection(data.status);
+    if(data.type === 'config' && data.config) {
+      cfg = Object.assign({}, cfg, data.config);
+      localStorage.setItem(KEY, JSON.stringify(cfg));
+    }
+  };
+  socket.onclose = () => setTimeout(connectStatus, 2000);
+}
+connectStatus();
+</script>
+</body>
+</html>

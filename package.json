@@ -1,19 +1,14 @@
 {
-  "name": "tortulive-webserver",
+  "name": "carrera-tortugas-live",
   "version": "1.0.0",
   "private": true,
-  "description": "Tortulive SaaS MVP server and modular PWA overlay",
-  "engines": {
-    "node": ">=22.5"
-  },
+  "type": "module",
   "scripts": {
     "start": "node server.js",
-    "start:api": "node api-server.js",
-    "start:web": "node web-server.js",
-    "check": "node --check server.js && node --check api-server.js && node --check web-server.js && node --check api/database.js && node --check api/tiktok-connection-manager.js && node --check api/credentials.js && node --check api/contract.js && node --check webserver/service-worker.js && node --check webserver/overlay-coordinator.js && node --check webserver/layers/event-sounds.js",
-    "test": "node --test api/tiktok-connection-manager.test.js api/database-counters.test.js api/event-sounds.test.js api/gift-overlay.test.js api/overlay-connection-indicator.test.js api/webserver-integration.test.js"
+    "test": "node --test"
   },
   "dependencies": {
-    "tiktok-live-connector": "^2.5.0"
+    "tiktok-live-connector": "^2.1.0",
+    "ws": "^8.18.0"
   }
 }

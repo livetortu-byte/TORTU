@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eventos LIVE · Carrera de Tortugas</title>
+<style>
+  :root{--bg:#0b1117;--card:#16212b;--line:#2b3a47;--tx:#f1f5f9;--mut:#94a3b8}
+  *{box-sizing:border-box}body{margin:0;padding:16px;background:var(--bg);color:var(--tx);font:14px Arial,sans-serif}
+  main{max-width:900px;margin:auto}h1{font-size:22px;margin:0 0 8px}a{color:#60a5fa}.sub{color:var(--mut);margin:0 0 14px}
+  .tools{display:flex;gap:8px;align-items:center;margin-bottom:12px}button{border:0;border-radius:18px;padding:8px 14px;background:#334155;color:white;cursor:pointer}
+  #events{display:grid;gap:8px}.event{display:flex;align-items:center;gap:12px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+  .avatar{width:48px;height:48px;flex:none;border-radius:50%;object-fit:cover;background:#334155;display:grid;place-items:center;font-size:24px}
+  .details{min-width:0;flex:1}.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.name{font-weight:bold}.badge{border-radius:12px;padding:3px 8px;background:#334155}
+  .cerro{color:#fca5a5}.oli{color:#e2e8f0}.content{margin-top:5px;overflow-wrap:anywhere}.time{color:var(--mut);font-size:12px}
+  #empty{padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--mut)}
+</style>
+</head>
+<body><main>
+  <h1>📡 Registro de eventos LIVE</h1>
+  <p class="sub"><a href="dashboard.html">Volver al panel</a> · Los eventos se muestran aquí antes de llegar al overlay.</p>
+  <div class="tools"><button id="clear">Vaciar vista</button><span id="connection">Conectando…</span></div>
+  <div id="events"></div><div id="empty">Esperando eventos…</div>
+</main>
+<script>
+const list = document.getElementById('events');
+const empty = document.getElementById('empty');
+const seen = new Set();
+function render(event) {
+  if (!event || seen.has(event.id)) return;
+  seen.add(event.id);
+  const row = document.createElement('article');
+  row.className = 'event';
+  const avatar = document.createElement(event.avatar ? 'img' : 'div');
+  avatar.className = 'avatar';
+  if (event.avatar) { avatar.src = event.avatar; avatar.alt = ''; avatar.onerror = () => { avatar.replaceWith(Object.assign(document.createElement('div'), {className:'avatar', textContent:'👤'})); }; }
+  else avatar.textContent = '👤';
+  const details = document.createElement('div'); details.className = 'details';
+  const top = document.createElement('div'); top.className = 'top';
+  const name = document.createElement('span'); name.className = 'name'; name.textContent = event.nickname || event.user;
+  const type = document.createElement('span'); type.className = 'badge'; type.textContent = event.type;
+  const team = document.createElement('span'); team.className = 'badge ' + event.team; team.textContent = event.team === 'oli' ? 'Olimpia' : 'Cerro';
+  const time = document.createElement('time'); time.className = 'time'; time.textContent = new Date(event.timestamp).toLocaleTimeString();
+  top.append(name, type, team, time);
+  const content = document.createElement('div'); content.className = 'content'; content.textContent = event.content || event.text || event.gift || event.type;
+  details.append(top, content); row.append(avatar, details);
+  list.prepend(row); empty.hidden = true;
+  while (list.children.length > 200) list.lastElementChild.remove();
+}
+document.getElementById('clear').onclick = () => { list.replaceChildren(); seen.clear(); empty.hidden = false; };
+async function load() {
+  const response = await fetch('/api/events?limit=100');
+  if (!response.ok) throw new Error('No se pudo cargar el registro de eventos.');
+  (await response.json()).reverse().forEach(render);
+}
+load().catch(error => { empty.textContent = error.message; });
+function connect() {
+  const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  socket.onmessage = message => {
+    const data = JSON.parse(message.data);
+    if (data.type === 'eventLog') render(data.event);
+    if (data.type === 'connection') document.getElementById('connection').textContent = `TikTok: ${data.status.message}`;
+  };
+  socket.onclose = () => setTimeout(connect, 2000);
+}
+connect();
+</script>
+</body>
+</html>
