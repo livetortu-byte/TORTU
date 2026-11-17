@@ -1,4 +1,4 @@
-const CACHE = 'tortugas-live-v1';
+const CACHE = 'tortugas-live-v2';
 const CORE = ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));

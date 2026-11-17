@@ -35,7 +35,7 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0' },
     stdio: 'ignore'
   });
   let socket;

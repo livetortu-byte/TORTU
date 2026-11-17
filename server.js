@@ -28,7 +28,7 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') console.warn('No se pudo cargar la configuración guardada:', error.message);
 }
-let status = { state: 'disconnected', username: '', retryCount: 0, message: 'Desconectado' };
+let status = { state: 'disconnected', username: 'tortulive', retryCount: 0, message: 'Desconectado' };
 let connection = null;
 let connectionGeneration = 0;
 let retryTimer = null;
@@ -321,6 +321,7 @@ wss.on('connection', socket => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Carrera de Tortugas disponible en http://localhost:${port}`);
+  if (process.env.AUTOCONNECT_TIKTOK !== '0') connectAttempt(connectionGeneration);
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {

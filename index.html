@@ -21,6 +21,10 @@
   body.live{--safe-top:64px;--safe-bottom:120px}   /* ?live=1: deja libre lo que tapa la interfaz de TikTok (arriba: perfil; abajo: chat) */
   #app{position:relative;height:100%;width:min(100vw,calc(100vh * 9 / 16));margin:0 auto;display:flex;flex-direction:column;
     padding-bottom:var(--safe-bottom)}
+  #connectionIndicator{position:absolute;left:8px;bottom:8px;z-index:11;width:14px;height:14px;border:2px solid #fff;
+    border-radius:50%;box-shadow:0 0 8px #000;background:#facc15}
+  #connectionIndicator[data-state="connected"]{background:#22c55e}
+  #connectionIndicator[data-state="failed"]{background:#ef4444}
 
   /* CABECERA */
   #head{display:flex;height:calc(106px + var(--safe-top));padding-top:var(--safe-top);flex:0 0 auto}
@@ -134,6 +138,7 @@
 </head>
 <body>
 <div id="app">
+  <div id="connectionIndicator" data-state="connecting" role="status" aria-label="Intentando conectar con TikTok" title="Intentando conectar con TikTok"></div>
   <div id="head">
     <div class="team">
       <small class="wins" id="wCerro"></small><b class="combo" id="cbCerro"></b>
@@ -600,13 +605,13 @@ function pickVoice(){
 }
 if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 const spokenName = u => String(u).replace(/[_.\-]+/g, ' ').replace(/\d+/g, ' ').trim() || 'alguien';
-function say(text){                      // voz alegre; sin emojis ni enlaces; máx. 3 frases en cola
+function say(text){                      // voz animada; sin emojis ni enlaces; máx. 3 frases en cola
   if(!voiceOn || !window.speechSynthesis || sayQ >= 3) return;
   text = String(text).replace(/https?:\S+/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').slice(0, 140).trim();
   if(!text) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = esVoice ? esVoice.lang : 'es-ES'; if(esVoice) u.voice = esVoice;
-  u.pitch = 1.35; u.rate = 1.08; u.volume = vol;
+  u.pitch = 1.5; u.rate = 1.15; u.volume = vol;
   sayQ++; u.onend = u.onerror = () => { sayQ = Math.max(0, sayQ - 1); };
   speechSynthesis.speak(u);
 }
@@ -777,6 +782,15 @@ addEventListener('storage', e => { if(e.key === CFG_KEY) applyCfg(loadCfg()); })
    {"team":"cerro","type":"like","user":"juan_pyg"}
    (type: like | comment | follow | share | join | gift)                   */
 const qs = new URLSearchParams(location.search);
+const connectionIndicator = document.getElementById('connectionIndicator');
+function updateConnectionIndicator(state){
+  const connected = state === 'connected';
+  const failed = state === 'failed' || state === 'disconnected';
+  const label = connected ? 'TikTok conectado' : failed ? 'TikTok desconectado' : 'Intentando conectar con TikTok';
+  connectionIndicator.dataset.state = connected ? 'connected' : failed ? 'failed' : 'connecting';
+  connectionIndicator.setAttribute('aria-label', label);
+  connectionIndicator.title = label;
+}
 if(qs.has('live')){                     // modo directo: sin botones de prueba y con márgenes libres para la interfaz de TikTok
   document.body.classList.add('live');
   document.getElementById('bar').style.display = 'none';
@@ -792,13 +806,14 @@ if(wsUrl){
     ws.onmessage = e => {
       try{
         const d = JSON.parse(e.data);
-        if(d.type === 'raceEvent' && d.event) handleEvent(d.event);
+        if(d.type === 'connection' && d.status) updateConnectionIndicator(d.status.state);
+        else if(d.type === 'raceEvent' && d.event) handleEvent(d.event);
         else if(d.type === 'config' && d.config) applyCfg(d.config);
         else if(ACTIONS[d.type] && teams[d.team]) handleEvent(d);
         else if(d.team && Number.isFinite(Number(d.meters))) addMeters(d.team, Number(d.meters));
       }catch(error){ console.error('No se pudo procesar el mensaje del servidor:', error); }
     };
-    ws.onclose = () => { setTimeout(connectOverlay, retryDelay); retryDelay = Math.min(retryDelay * 2, 10000); };
+    ws.onclose = () => { updateConnectionIndicator('retrying'); setTimeout(connectOverlay, retryDelay); retryDelay = Math.min(retryDelay * 2, 10000); };
     ws.onerror = () => ws.close();
   };
   connectOverlay();
