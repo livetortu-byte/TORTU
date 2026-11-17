@@ -14,7 +14,7 @@ const RETRY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_EVENTS = 500;
 const MAX_CONNECTOR_LOGS = 500;
 const defaultConfig = {
-  on: true, show: 5, alertFall: 8, gifts: ['rose', 'donut', 'heart', 'confetti', 'corgi', 'lion', 'galaxy', 'ice', 'rocket', 'diamond', 'crown', 'car', 'fireworks', 'music', 'star'],
+  on: true, show: 5, alertFall: 8, alertFallEnabled: false, gifts: ['rose', 'donut', 'heart', 'confetti', 'corgi', 'lion', 'galaxy', 'ice', 'rocket', 'diamond', 'crown', 'car', 'fireworks', 'music', 'star'],
   lanes: { cerro: true, oli: true },
   meters: { like: 3, comment: 1, share: 5, follow: 10, join: 2 },
   sound: true, voice: true, vol: 70, bot: false, rate: 30
@@ -323,6 +323,9 @@ const server = createServer(async (request, response) => {
       };
       if (incoming.alertFall !== undefined && (!Number.isFinite(Number(incoming.alertFall)) || Number(incoming.alertFall) < 3 || Number(incoming.alertFall) > 20)) {
         return json(response, 400, { error: 'La duración de caída debe estar entre 3 y 20 segundos.' });
+      }
+      if (incoming.alertFallEnabled !== undefined && typeof incoming.alertFallEnabled !== 'boolean') {
+        return json(response, 400, { error: 'La opción de caída debe ser booleana.' });
       }
       const nextConfig = {
         ...config, ...incoming,

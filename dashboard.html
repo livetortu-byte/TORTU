@@ -72,8 +72,9 @@
 
 <section>
   <h2>⬇️ Caída de alertas</h2>
+  <div class="row"><label class="sw"><input type="checkbox" id="alertFallEnabled"> Activar caída de alertas</label></div>
   <div class="row"><label for="alertFall">Duración de caída del avatar</label><span><input type="range" id="alertFall" min="3" max="20" step="1" style="width:55%"> <b id="alertFallValue">8 s</b></span></div>
-  <p class="note">Las alertas aparecen arriba y caen hasta abajo. Más segundos hacen que la caída sea más lenta.</p>
+  <p class="note">Activada: aparecen arriba y caen. Desactivada: se muestran fijas sobre la pista. El tiempo define cuándo desaparecen; con caída, más segundos significa más lentitud.</p>
 </section>
 
 <section>
@@ -140,7 +141,7 @@ const GIFTS = [
   ['crown','👑','Corona'],['car','🏎️','Auto'],['fireworks','🎆','Fuegos'],['music','🎵','Música'],['star','⭐','Estrella']
 ];
 const DEFM = {like:3, comment:1, share:5, follow:10, join:2};
-const DEF = {on:true, meters:DEFM, show:5, alertFall:8, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
+const DEF = {on:true, meters:DEFM, show:5, alertFall:8, alertFallEnabled:false, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
 const clampAlertFall = value => Math.max(3, Math.min(20, Number(value) || 8));
 let cfg;
 try{ cfg = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }catch(_){ cfg = Object.assign({}, DEF); }
@@ -157,6 +158,8 @@ function save(extra){
     .catch(error => { $('feedback').textContent = error.message; });
   $('saved').classList.add('show'); clearTimeout(tm); tm = setTimeout(() => $('saved').classList.remove('show'), 1200);
 }
+$('alertFallEnabled').checked = cfg.alertFallEnabled === true;
+$('alertFallEnabled').onchange = e => save({alertFallEnabled:e.target.checked});
 function drawGrid(){
   $('grid').innerHTML = '';
   GIFTS.forEach(([k, e, n]) => {
@@ -253,9 +256,11 @@ fetch('/api/config').then(response => response.ok ? response.json() : null).then
   cfg.lanes = Object.assign({}, DEF.lanes, cfg.lanes);
   cfg.meters = Object.assign({}, DEFM, cfg.meters);
   cfg.alertFall = clampAlertFall(cfg.alertFall);
+  cfg.alertFallEnabled = cfg.alertFallEnabled === true;
   localStorage.setItem(KEY, JSON.stringify(cfg));
   $('on').checked = cfg.on; $('show').value = cfg.show;
   $('alertFall').value = cfg.alertFall; $('alertFallValue').textContent = cfg.alertFall + ' s';
+  $('alertFallEnabled').checked = cfg.alertFallEnabled;
   for(const k of ['cerro','oli']) $('lane_' + k).checked = cfg.lanes[k] !== false;
   drawGrid(); drawM();
   $('sound').checked = cfg.sound; $('voice').checked = cfg.voice;

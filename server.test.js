@@ -68,11 +68,14 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
       method:'POST', headers:{'content-type':'application/json'},
       body:JSON.stringify({username:'https://tiktok.com/@bad'})
     })).status, 400);
-    const config = await post(base, '/api/config', { meters: { comment: 8 }, gifts: ['rose'], alertFall: 12 });
+    const config = await post(base, '/api/config', { meters: { comment: 8 }, gifts: ['rose'], alertFall: 12, alertFallEnabled: true });
     assert.equal(config.status, 200);
     assert.equal((await config.json()).meters.comment, 8);
-    assert.equal((await (await fetch(base + '/api/config')).json()).alertFall, 12);
+    const savedConfig = await (await fetch(base + '/api/config')).json();
+    assert.equal(savedConfig.alertFall, 12);
+    assert.equal(savedConfig.alertFallEnabled, true);
     assert.equal((await post(base, '/api/config', { alertFall: 25 })).status, 400);
+    assert.equal((await post(base, '/api/config', { alertFallEnabled: 'true' })).status, 400);
 
     socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     const initialGiftCounter = new Promise((resolve, reject) => {
