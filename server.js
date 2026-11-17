@@ -54,6 +54,13 @@ function safeText(value, max = 500) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
 }
 
+function connectionError(error) {
+  const exception = error?.exception;
+  const statusCode = exception?.response?.status || exception?.status;
+  if (statusCode) return `TikTok respondió con HTTP ${statusCode}`;
+  return safeText(exception?.message || error?.info || error?.message || 'Error de conexión', 180);
+}
+
 function normalizeTeam(text) {
   const normalized = String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const words = normalized.match(/[a-z0-9]+/g) || [];
@@ -160,7 +167,7 @@ function attachTikTokEvents(conn) {
     if (conn === connection) scheduleRetry('La conexión con TikTok se interrumpió');
   });
   conn.on('error', error => {
-    if (conn === connection) scheduleRetry(safeText(error?.message || 'Error de conexión', 180));
+    if (conn === connection) scheduleRetry(connectionError(error));
   });
 }
 
@@ -200,7 +207,7 @@ async function connectAttempt(generation) {
     retryStartedAt = 0;
     setStatus({ state: 'connected', message: 'Conectado', retryCount: 0, nextRetryAt: null });
   } catch (error) {
-    if (generation === connectionGeneration) scheduleRetry(safeText(error?.message || 'No se pudo conectar', 180));
+    if (generation === connectionGeneration) scheduleRetry(connectionError(error));
   }
 }
 
@@ -256,7 +263,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname === '/api/connect' && request.method === 'POST') {
     try {
       const incoming = await bodyJson(request);
-      const username = safeText(incoming.username, 40).replace(/^@/, '');
+      const username = safeText(incoming.username, 40).replace(/^@/, '').toLowerCase();
       if (!/^[\w.]{2,40}$/.test(username)) return json(response, 400, { error: 'Ingresa un usuario de TikTok válido, sin URL.' });
       await disconnectTikTok();
       retryStartedAt = 0;
