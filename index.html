@@ -72,14 +72,13 @@
   #app.stop .leg,#app.stop .turtle svg{animation-play-state:paused}
 
   /* ALERTAS (avatar + icono de la acción). Cerro a la izquierda, Olimpia a la derecha */
-  #alerts{position:absolute;left:6px;right:6px;bottom:8px;z-index:5;display:flex;flex-direction:column;gap:6px;pointer-events:none}
-  .toast{display:flex;padding:0 10px 10px 0;animation:tin .25s ease-out}
-  .toast.cerro{align-self:flex-start}
-  .toast.oli{align-self:flex-end}
+  #alerts{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .toast{position:absolute;top:0;display:flex;padding:0 10px 10px 0;animation:tin .25s ease-out}
+  .toast.cerro{left:6px}
+  .toast.oli{right:6px}
   .toast.out{opacity:0;transform:translateY(8px);transition:.3s}
   @keyframes tin{from{opacity:0;transform:translateY(14px) scale(.9)}to{opacity:1;transform:none}}
-  #alerts.falling-mode{inset:0;display:block;overflow:hidden}
-  #alerts.falling-mode .toast{position:absolute;top:-80px;align-self:unset;
+  #alerts.falling-mode .toast{top:-80px;
     animation:alertFall var(--alert-fall-duration,8s) linear forwards}
   #alerts.falling-mode .toast.cerro{left:6px}
   #alerts.falling-mode .toast.oli{right:6px}
@@ -546,6 +545,19 @@ function showAlert(ev){
   const t = document.createElement('div');
   t.className = 'toast ' + ev.team;
   t.style.setProperty('--alert-fall-duration', `${ALERT_FALL_SECONDS}s`);
+  if(!fallMode){
+    const maxTop = Math.max(0, box.clientHeight - 72);
+    const occupied = Array.from(box.children)
+      .filter(existing => existing.classList.contains(ev.team) && existing.style.top && !existing.classList.contains('out'))
+      .map(existing => Number.parseFloat(existing.style.top))
+      .filter(Number.isFinite);
+    let top = Math.random() * maxTop;
+    for(let attempt = 0; attempt < 12; attempt++){
+      const candidate = Math.random() * maxTop;
+      if(occupied.every(value => Math.abs(value - candidate) >= 80)){ top = candidate; break; }
+    }
+    t.style.top = `${Math.round(top)}px`;
+  }
   t.innerHTML = `<div class="av"><span class="avin"></span>${badge}</div>`;
   fillAvatar(t.querySelector('.avin'), ev);
   box.appendChild(t);
