@@ -127,10 +127,10 @@
   .slot{position:absolute;left:0;right:0;top:34px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
   .gslot{position:relative;z-index:4;height:70px;font-size:60px;line-height:70px;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif}
   .gslot.in{animation:gdrop .5s ease-out,gbob .9s ease-in-out .5s infinite alternate}
+  .gslot.out{animation:gfadedown .4s ease forwards}
   @keyframes gdrop{from{opacity:0;transform:translateY(-40px) scale(.3)}to{opacity:1;transform:none}}
   @keyframes gbob{from{transform:translateY(0)}to{transform:translateY(6px) scale(1.08)}}
-  .gtime{width:64%;height:7px;background:#000a;border:1px solid #fff;border-radius:5px;overflow:hidden;visibility:hidden}
-  .gtime i{display:block;height:100%;width:100%;background:#facc15}
+  @keyframes gfadedown{to{opacity:0;transform:translateY(12px) scale(.8)}}
   .avin,.pilot{display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%}
   .avin{width:100%;height:100%}
   .avin img,.pilot img{width:100%;height:100%;object-fit:cover}
@@ -217,7 +217,7 @@
        servidor y este archivo solo las muestra.
 
   REGLAS DE METROS (hoy, en ACTIONS)
-    like 3 · comment 1 · join 2 · follow 10 · share 5 (editables en el panel)
+    like 10 · comment 15 · join 1 · follow 20 · share 20 (editables en el panel)
     inactividad: tras 10 s sin eventos, avanza al azar 0,1–3 m cada 10 s
     gift: no suma metros; la tortuga crece x3 (GIANT) y camina SOLA hasta
           100 m a GIFT_SPEED m/s y gana.
@@ -225,7 +225,7 @@
   GAMIFICACIÓN (v2)
     REGALO DE USUARIO  Cuando un espectador envía un regalo (evento gift), la tortuga de su equipo crece x3
           y camina sola; el regalo aparece bajo la bandera de meta de esa vía durante GIFT_SHOW s (5 por
-          defecto, con barra de tiempo) y el AVATAR REDONDO de quien lo envió se pone sobre el caparazón.
+          defecto, luego se desvanece sin mostrar cuenta regresiva) y el AVATAR REDONDO se pone sobre el caparazón.
           El panel también puede mostrar regalos automáticos distintos en ambos equipos, según el intervalo
           configurado y sin depender de eventos.
           En dashboard.html: catálogo con casillas (qué regalos se MUESTRAN; el efecto x3 ocurre siempre),
@@ -366,20 +366,22 @@ for(const k in teams){
   Object.assign(t, {idle:0, wins:0, combo:0, comboAt:-1e9, ms:0, users:{}, autoOn:true, pilot:null, gtimer:0,
                     cb:document.getElementById('cb' + C), w:document.getElementById('w' + C)});
   t.slot = document.createElement('div'); t.slot.className = 'slot';
-  t.slot.innerHTML = '<div class="gslot"></div><div class="gtime"><i></i></div>';
+  t.slot.innerHTML = '<div class="gslot"></div>';
   t.lane.appendChild(t.slot);
-  t.gs = t.slot.children[0]; t.gt = t.slot.children[1]; t.gbar = t.gt.firstChild;
+  t.gs = t.slot.firstElementChild;
 }
 let lastEventAt = performance.now();
 for(const k in teams) teams[k].idle = lastEventAt;
-function hideSlot(k){ const t = teams[k]; clearTimeout(t.gtimer); t.gs.textContent = ''; t.gt.style.visibility = 'hidden'; }
+function hideSlot(k){ const t = teams[k]; clearTimeout(t.gtimer); t.gs.textContent = ''; t.gs.classList.remove('in', 'out'); }
 function showGift(k, emoji){             // el regalo aparece bajo la bandera de meta GIFT_SHOW s
   const t = teams[k];
-  t.gs.textContent = emoji; t.gs.classList.remove('in'); void t.gs.offsetWidth; t.gs.classList.add('in');
-  t.gt.style.visibility = 'visible';
-  t.gbar.style.transition = 'none'; t.gbar.style.width = '100%'; void t.gbar.offsetWidth;
-  t.gbar.style.transition = 'width ' + GIFT_SHOW + 's linear'; t.gbar.style.width = '0%';
-  clearTimeout(t.gtimer); t.gtimer = setTimeout(() => hideSlot(k), GIFT_SHOW * 1000);
+  clearTimeout(t.gtimer);
+  t.gs.classList.remove('in', 'out'); t.gs.textContent = emoji; void t.gs.offsetWidth; t.gs.classList.add('in');
+  const fadeMs = 400;
+  t.gtimer = setTimeout(() => {
+    t.gs.classList.remove('in'); t.gs.classList.add('out');
+    t.gtimer = setTimeout(() => { t.gs.textContent = ''; t.gs.classList.remove('out'); }, fadeMs);
+  }, Math.max(0, GIFT_SHOW * 1000 - fadeMs));
 }
 function clearPilot(k){ const t = teams[k]; if(t.pilot){ t.pilot.forEach(x => x.remove()); t.pilot = null; } }
 function setPilot(k, ev){                // avatar redondo del que envió el regalo, sobre el caparazón, y debajo su nombre
@@ -531,11 +533,11 @@ const P = {
   gift:'M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8h5.08v6z'
 };
 const ACTIONS = {
-  like:   {path:P.heart,   color:'#ff2d55', m:5},
+  like:   {path:P.heart,   color:'#ff2d55', m:10},
   comment:{path:P.comment, color:'#3b82f6', m:15},
   follow: {path:P.plus,    color:'#22c55e', m:20},
   share:  {path:P.share,   color:'#f59e0b', m:20},
-  join:   {path:null,      color:'#000',    m:2},   // icono = bandera del equipo
+  join:   {path:null,      color:'#000',    m:1},   // icono = bandera del equipo
   gift:   {path:P.gift,    color:'#eab308', m:0}    // regalo: la tortuga crece x3 y camina hasta 100
 };
 const MOODS = {like:'😍', comment:'😮', follow:'🥰', share:'😄', join:'😃', gift:'🤩'};
@@ -554,6 +556,7 @@ const GIFTS = [
   {k:'ice',      e:'🍦'}, {k:'rocket',  e:'🚀'}, {k:'diamond', e:'💎'}, {k:'crown', e:'👑'},
   {k:'car',      e:'🏎️'}, {k:'fireworks',e:'🎆'}, {k:'music',  e:'🎵'}, {k:'star',  e:'⭐'}
 ];
+const DEFAULT_GIFTS = ['rose','donut','heart','confetti','diamond'];
 const giftEmoji = k => (GIFTS.find(g => g.k === k) || {e:'🎁'}).e;
 const NAMES = ['juan_pyg','maria.cde','el_ciclon','olimpiafan','cerrista88','luisito','carla_ps','don_pepe',
                'tiktok_cde','rodri10','la_tortuga','sofi_ar','pablo.fc','dani_7','anita_py','gringo_cde'];
@@ -737,7 +740,7 @@ function setBot(on){ clearInterval(botTimer); botTimer = null; if(on) botTimer =
    {on, show(s), autoGift, autoGiftInterval(s), gifts:[claves], lanes:{cerro,oli}, meters:{like,comment,follow,share,join}, sound, voice, vol(0-100), bot, rate, cmd:{id,name:'gift',team}}
    Por defecto: regalo 5 s en pantalla, todo el catálogo, sonido y voz activos, bot APAGADO. */
 const CFG_KEY = 'tortugas.cfg';
-let cfg = {}, poolGifts = GIFTS, lastCmd = 0;
+let cfg = {}, poolGifts = GIFTS.filter(g => DEFAULT_GIFTS.includes(g.k)), lastCmd = 0;
 function loadCfg(){ try{ return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); }catch(_){ return {}; } }
 function saveCfg(p){ cfg = Object.assign({}, loadCfg(), p); try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(_){} }
 function setGift(on){ giftsOn = on; if(!on) for(const k in teams){ hideSlot(k); clearPilot(k); } }
@@ -750,7 +753,7 @@ function applyCfg(c){
   AUTO_GIFT_ENABLED = cfg.autoGift !== false;
   AUTO_GIFT_INTERVAL_SECONDS = Number.isFinite(Number(cfg.autoGiftInterval)) ? Math.max(10, Math.min(600, Number(cfg.autoGiftInterval))) : 60;
   document.getElementById('alerts').classList.toggle('falling-mode', ALERT_FALL_ENABLED);
-  poolGifts = Array.isArray(cfg.gifts) ? GIFTS.filter(g => cfg.gifts.includes(g.k)) : GIFTS;
+  poolGifts = Array.isArray(cfg.gifts) ? GIFTS.filter(g => cfg.gifts.includes(g.k)) : GIFTS.filter(g => DEFAULT_GIFTS.includes(g.k));
   setGift(cfg.on !== false);
   for(const k in teams) if(cfg.lanes && k in cfg.lanes && cfg.lanes[k] !== teams[k].autoOn) setLane(k, cfg.lanes[k]);
   const rate = [30, 60, 90].includes(cfg.rate) ? cfg.rate : 30, bot = !wsUrl && cfg.bot === true;
@@ -782,7 +785,7 @@ addEventListener('storage', e => { if(e.key === CFG_KEY) applyCfg(loadCfg()); })
        normalizados {team, type, user}. El EQUIPO lo decide el servidor (p. ej. el primer
        comentario con "cerro"/"olimpia" = join). Falta definir los likes de quien aún no eligió.
     b) MOTOR DE CARRERA  (bucle de ~10 Hz; GOAL = 100 m; gana el primero que toca la meta)
-       · Metros por acción: like 3 · comment 1 · join 2 · follow 10 · share 5 (editables en el panel).
+       · Metros por acción: like 10 · comment 15 · join 1 · follow 20 · share 20 (editables en el panel).
        · COMBO: acciones del mismo equipo con < 5 s entre sí encadenan racha;
          multiplicador = 1 + floor(racha / 4) * 0.5 (x1, x1.5, x2, x2.5...). Si pasan 5 s, racha = 1.
        · REMONTADA: si el equipo va > 15 m por detrás del rival, cada acción suma +1 m.

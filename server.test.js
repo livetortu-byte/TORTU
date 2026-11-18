@@ -11,7 +11,6 @@ import { test } from 'node:test';
 import { WebSocket } from 'ws';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const configFile = path.join(root, '.tortugas-config.json');
 
 async function availablePort() {
   const server = createServer();
@@ -31,17 +30,16 @@ async function post(base, route, body) {
 }
 
 test('TikTok events are logged and forwarded to the overlay with config applied', { timeout: 30000 }, async () => {
-  let savedConfig;
-  try { savedConfig = await readFile(configFile); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const port = await availablePort();
   const base = `http://127.0.0.1:${port}`;
+  const configFile = path.join(tmpdir(), `tortugas-config-${randomUUID()}.json`);
   const giftCounterFile = path.join(tmpdir(), `tortugas-gift-counter-${randomUUID()}.json`);
   const matchCounterFile = path.join(tmpdir(), `tortugas-match-counter-${randomUUID()}.json`);
   await writeFile(giftCounterFile, JSON.stringify({ count: 7, roomId: 'test-room' }));
   await writeFile(matchCounterFile, JSON.stringify({ count: 12 }));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0', GIFT_COUNTER_PATH: giftCounterFile, MATCH_COUNTER_PATH: matchCounterFile },
+    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0', CONFIG_PATH: configFile, GIFT_COUNTER_PATH: giftCounterFile, MATCH_COUNTER_PATH: matchCounterFile },
     stdio: 'ignore'
   });
   let socket;
@@ -56,6 +54,9 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     }
     assert.equal(ready, true, 'server should start');
     assert.equal((await fetch(base + '/api/status')).status, 200);
+    const defaultConfig = await (await fetch(base + '/api/config')).json();
+    assert.deepEqual(defaultConfig.meters, { like: 10, comment: 15, share: 20, follow: 20, join: 1 });
+    assert.deepEqual(defaultConfig.gifts, ['rose', 'donut', 'heart', 'confetti', 'diamond']);
     for (const page of ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/sw.js', '/version-check.js']) {
       assert.equal((await fetch(base + page)).status, 200, `${page} should be served`);
     }
@@ -213,8 +214,7 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     if (socket) socket.close();
     child.kill('SIGTERM');
     await once(child, 'exit');
-    if (savedConfig) await writeFile(configFile, savedConfig);
-    else await rm(configFile, { force: true });
+    await rm(configFile, { force: true });
     await rm(giftCounterFile, { force: true });
     await rm(matchCounterFile, { force: true });
   }

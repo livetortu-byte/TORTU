@@ -20,9 +20,9 @@ const RETRY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_EVENTS = 500;
 const MAX_CONNECTOR_LOGS = 500;
 const defaultConfig = {
-  on: true, show: 5, alertFall: 8, alertFallEnabled: false, gifts: ['rose', 'donut', 'heart', 'confetti', 'corgi', 'lion', 'galaxy', 'ice', 'rocket', 'diamond', 'crown', 'car', 'fireworks', 'music', 'star'],
+  on: true, show: 5, alertFall: 8, alertFallEnabled: false, gifts: ['rose', 'donut', 'heart', 'confetti', 'diamond'],
   lanes: { cerro: true, oli: true },
-  meters: { like: 5, comment: 15, share: 20, follow: 20, join: 2 },
+  meters: { like: 10, comment: 15, share: 20, follow: 20, join: 1 },
   autoGift: true, autoGiftInterval: 60,
   sound: true, voice: true, vol: 70, bot: false, rate: 30
 };

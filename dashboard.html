@@ -82,7 +82,7 @@
 <section>
   <h2>🎁 Regalos de los usuarios</h2>
   <div class="row"><label class="sw"><input type="checkbox" id="on"> Mostrar el regalo y el avatar de quien lo envía</label></div>
-  <div class="row"><span>Tiempo del regalo en pantalla</span><span><input type="number" id="show" min="1" step="1"> segundos</span></div>
+  <div class="row"><span>Tiempo antes de desvanecer el regalo</span><span><input type="number" id="show" min="1" step="1"> segundos</span></div>
   <div class="row"><label class="sw"><input type="checkbox" id="autoGift"> Mostrar regalos automáticos en ambos equipos</label></div>
   <div class="row"><span>Cada cuánto mostrar los regalos</span><span><input type="number" id="autoGiftInterval" min="10" max="600" step="5"> segundos</span></div>
   <div class="row"><span>Mostrar regalos de usuarios en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
@@ -145,8 +145,8 @@ const GIFTS = [
   ['lion','🦁','León'],['galaxy','🌌','Galaxia'],['ice','🍦','Helado'],['rocket','🚀','Cohete'],['diamond','💎','Diamante'],
   ['crown','👑','Corona'],['car','🏎️','Auto'],['fireworks','🎆','Fuegos'],['music','🎵','Música'],['star','⭐','Estrella']
 ];
-const DEFM = {like:5, comment:15, share:20, follow:20, join:2};
-const DEF = {on:true, meters:DEFM, show:5, alertFall:8, alertFallEnabled:false, autoGift:true, autoGiftInterval:60, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
+const DEFM = {like:10, comment:15, share:20, follow:20, join:1};
+const DEF = {on:true, meters:DEFM, show:5, alertFall:8, alertFallEnabled:false, autoGift:true, autoGiftInterval:60, sound:true, voice:true, vol:70, gifts:['rose','donut','heart','confetti','diamond'], lanes:{cerro:true, oli:true}, bot:false, rate:30};
 const clampAlertFall = value => Math.max(3, Math.min(20, Number(value) || 8));
 const clampAutoGiftInterval = value => Math.max(10, Math.min(600, Math.round(Number(value) || 60)));
 let cfg;
