@@ -85,6 +85,7 @@
   <div class="row"><span>Esperar sin eventos</span><span><input type="number" id="autoGiftInterval" min="10" max="600" step="5"> segundos</span></div>
   <div class="row"><span>Mostrar en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
   <div class="row"><span>Mostrar en vía Olimpia</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_oli"> ON</label><button class="pri" data-test="oli">Probar regalo</button></span></div>
+  <div class="row"><span>Contador de regalos de esta transmisión: <b id="giftCounterValue">0</b></span><span class="tools"><span id="giftCounterFeedback" role="status"></span><button id="resetGiftCounter" type="button">Reiniciar contador</button></span></div>
   <p class="note">El regalo aleatorio solo es decorativo: no avanza la tortuga ni cuenta como regalo real. Usa el catálogo habilitado y el tiempo de pantalla configurado.</p>
 </section>
 
@@ -248,6 +249,25 @@ async function request(path, data){
   if(!response.ok) throw new Error(result.error || 'La solicitud falló.');
   return result;
 }
+function updateGiftCounter(count){
+  const total = Number(count);
+  if(Number.isSafeInteger(total) && total >= 0) $('giftCounterValue').textContent = String(total);
+}
+$('resetGiftCounter').onclick = async () => {
+  if(!confirm('¿Reiniciar el contador de regalos de esta transmisión?')) return;
+  const button = $('resetGiftCounter');
+  button.disabled = true;
+  $('giftCounterFeedback').textContent = 'Reiniciando…';
+  try {
+    const result = await request('/api/gift-counter/reset');
+    updateGiftCounter(result.count);
+    $('giftCounterFeedback').textContent = 'Contador reiniciado.';
+  } catch(error) {
+    $('giftCounterFeedback').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
 $('connect').onclick = async () => {
   $('feedback').textContent = '';
   try { showConnection(await request('/api/connect', {username:$('username').value})); }
@@ -294,6 +314,7 @@ function connectStatus(){
   socket.onmessage = message => {
     const data = JSON.parse(message.data);
     if(data.type === 'connection') showConnection(data.status);
+    if(data.type === 'giftCounter') updateGiftCounter(data.count);
     if(data.type === 'config' && data.config) {
       cfg = Object.assign({}, cfg, data.config);
       localStorage.setItem(KEY, JSON.stringify(cfg));

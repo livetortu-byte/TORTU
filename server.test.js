@@ -95,6 +95,22 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     });
     await once(socket, 'open');
     assert.equal(await initialGiftCounter, 7);
+    const resetCounterUpdate = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Gift counter reset timed out')), 3000);
+      const onMessage = message => {
+        const data = JSON.parse(message.toString());
+        if (data.type !== 'giftCounter' || data.count !== 0) return;
+        clearTimeout(timeout);
+        socket.off('message', onMessage);
+        resolve(data.count);
+      };
+      socket.on('message', onMessage);
+    });
+    const resetCounterResponse = await post(base, '/api/gift-counter/reset', {});
+    assert.equal(resetCounterResponse.status, 200);
+    assert.equal((await resetCounterResponse.json()).count, 0);
+    assert.equal(await resetCounterUpdate, 0);
+    assert.equal(JSON.parse(await readFile(giftCounterFile, 'utf8')).count, 0);
     const streamedConnectorLog = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Connector log timed out')), 3000);
       const onMessage = message => {

@@ -98,6 +98,7 @@ function persistGiftCounter() {
   const snapshot = JSON.stringify({ count: giftCounter, roomId: giftRoomId });
   giftCounterWrite = giftCounterWrite.catch(() => {}).then(() => writeFile(giftCounterPath, snapshot, 'utf8'));
   giftCounterWrite.catch(error => console.error('No se pudo guardar el contador de regalos:', error.message));
+  return giftCounterWrite;
 }
 
 function connectionError(error) {
@@ -306,6 +307,17 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (url.pathname === '/api/status' && request.method === 'GET') return json(response, 200, status);
   if (url.pathname === '/api/config' && request.method === 'GET') return json(response, 200, config);
+  if (url.pathname === '/api/gift-counter/reset' && request.method === 'POST') {
+    const previousCount = giftCounter;
+    giftCounter = 0;
+    try { await persistGiftCounter(); }
+    catch (error) {
+      giftCounter = previousCount;
+      return json(response, 500, { error: 'No se pudo guardar el reinicio del contador de regalos.' });
+    }
+    broadcast({ type: 'giftCounter', count: giftCounter });
+    return json(response, 200, { count: giftCounter });
+  }
   if (url.pathname === '/api/connector-logs' && request.method === 'GET') return json(response, 200, connectorLogs);
   if (url.pathname === '/api/connector-logs/clear' && request.method === 'POST') {
     connectorLogs.length = 0;
