@@ -81,19 +81,19 @@
   <h2>🎁 Regalos de los usuarios</h2>
   <div class="row"><label class="sw"><input type="checkbox" id="on"> Mostrar el regalo y el avatar de quien lo envía</label></div>
   <div class="row"><span>Tiempo del regalo en pantalla</span><span><input type="number" id="show" min="1" step="1"> segundos</span></div>
-  <div class="row"><label class="sw"><input type="checkbox" id="autoGift"> Mostrar un regalo aleatorio si no hay eventos</label></div>
-  <div class="row"><span>Esperar sin eventos</span><span><input type="number" id="autoGiftInterval" min="10" max="600" step="5"> segundos</span></div>
-  <div class="row"><span>Mostrar en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
-  <div class="row"><span>Mostrar en vía Olimpia</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_oli"> ON</label><button class="pri" data-test="oli">Probar regalo</button></span></div>
+  <div class="row"><label class="sw"><input type="checkbox" id="autoGift"> Mostrar regalos automáticos en ambos equipos si no hay eventos</label></div>
+  <div class="row"><span>Intervalo sin eventos para mostrar en ambos equipos</span><span><input type="number" id="autoGiftInterval" min="10" max="600" step="5"> segundos</span></div>
+  <div class="row"><span>Mostrar regalos de usuarios en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
+  <div class="row"><span>Mostrar regalos de usuarios en vía Olimpia</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_oli"> ON</label><button class="pri" data-test="oli">Probar regalo</button></span></div>
   <div class="row"><span>Contador de regalos de esta transmisión: <b id="giftCounterValue">0</b></span><span class="tools"><span id="giftCounterFeedback" role="status"></span><button id="resetGiftCounter" type="button">Reiniciar contador</button></span></div>
-  <p class="note">El regalo aleatorio solo es decorativo: no avanza la tortuga ni cuenta como regalo real. Usa el catálogo habilitado y el tiempo de pantalla configurado.</p>
+  <p class="note">Tras cada intervalo sin eventos, aparece un regalo distinto en cada equipo. Usa el catálogo habilitado y desaparece según el tiempo configurado; no mueve las tortugas ni cuenta en el contador. Habilita al menos dos regalos en la galería.</p>
 </section>
 
 <section>
   <h2>🖼 Galería de regalos <span style="color:var(--mut);font-weight:normal" id="count"></span></h2>
   <div class="tools"><button id="all">Marcar todos</button><button id="none">Quitar todos</button></div>
   <div class="grid" id="grid"></div>
-  <p class="note">Solo se muestran los regalos marcados cuando un usuario los envía. Sin ninguno marcado no se muestra ningún regalo.</p>
+  <p class="note">Los regalos de usuarios y los automáticos usan solo los elementos marcados. Para mostrar regalos distintos en ambos equipos, habilita al menos dos.</p>
 </section>
 
 <section>

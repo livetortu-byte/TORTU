@@ -665,12 +665,14 @@ let autoGiftTimer = null;
 function scheduleAutoGift(){
   clearTimeout(autoGiftTimer);
   autoGiftTimer = null;
-  if(!AUTO_GIFT_ENABLED || !giftsOn || !poolGifts.length) return;
+  if(!AUTO_GIFT_ENABLED || poolGifts.length < 2) return;
   autoGiftTimer = setTimeout(() => {
     const idleFor = performance.now() - lastEventAt;
     if(idleFor >= AUTO_GIFT_INTERVAL_SECONDS * 1000){
-      const lanes = Object.keys(teams).filter(k => teams[k].autoOn);
-      if(lanes.length) showGift(pick(lanes), pick(poolGifts).e);
+      const cerroGift = pick(poolGifts);
+      const oliGift = pick(poolGifts.filter(gift => gift.k !== cerroGift.k));
+      showGift('cerro', cerroGift.e);
+      showGift('oli', oliGift.e);
     }
     scheduleAutoGift();
   }, AUTO_GIFT_INTERVAL_SECONDS * 1000);
