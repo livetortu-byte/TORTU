@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#101820">
+<meta name="app-version" content="__APP_VERSION__">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="/version-check.js" defer></script>
 <title>Carrera de Tortugas</title>
 <style>
   :root{
@@ -221,13 +223,14 @@
     REGALO DE USUARIO  Cuando un espectador envía un regalo (evento gift), la tortuga de su equipo crece x3
           y camina sola; el regalo aparece bajo la bandera de meta de esa vía durante GIFT_SHOW s (5 por
           defecto, con barra de tiempo) y el AVATAR REDONDO de quien lo envió se pone sobre el caparazón.
-          Si no llegan eventos, un regalo del catálogo puede aparecer de forma decorativa según el panel.
+          El panel también puede mostrar regalos automáticos distintos en ambos equipos, según el intervalo
+          configurado y sin depender de eventos.
           En dashboard.html: catálogo con casillas (qué regalos se MUESTRAN; el efecto x3 ocurre siempre),
           tiempo en pantalla, mostrar/ocultar por vía y un botón de regalo de prueba.
     SONIDO    Efectos sintetizados (WebAudio) por acción, combo, hito y victoria. Hace falta un toque en la
           página para que el navegador permita el audio.
     VOZ EN OFF  Voz alegre en español (speechSynthesis): lee "usuario, del equipo, dice: comentario" (sin
-          emojis ni enlaces, máx. 10 en cola), agradece cada regalo y anuncia al ganador. El evento comment debe traer "text".
+         emojis ni enlaces), agradece cada regalo y anuncia al ganador. El evento comment debe traer "text".
     COMBO     Acciones del mismo equipo con menos de COMBO_WINDOW s entre sí encadenan
           racha: cada 4 acciones el multiplicador sube +0,5 (x1,5 · x2 · x2,5 máx.).
           Se ve como 🔥 xN junto al nombre del equipo.
@@ -575,7 +578,6 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
   if(finished || !ACTIONS[ev.type] || !teams[ev.team]) return;
   const t = teams[ev.team];
   lastEventAt = performance.now();
-  scheduleAutoGift();
   for(const k in teams) teams[k].idle = lastEventAt;
   showAlert(ev);
   const moodNow = performance.now();
@@ -584,7 +586,7 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
     t.moodUntil = moodNow + 10000;
   }
   sfx(ev.type);                          // sonido + voz en off
-  if(ev.type === 'comment' && ev.text) say(`${spokenName(ev.nickname || ev.user)}, del equipo ${t.name}, dice: ${ev.text}`);
+  if(ev.type === 'comment' && (ev.text || ev.content)) say(`${spokenName(ev.nickname || ev.user)}, del equipo ${t.name}, dice: ${ev.text || ev.content}`);
   if(ev.type === 'gift'){                // regalo de un usuario: tortuga x3 y camina sola; avatar en el caparazón
     t.gift = true; say('¡Gracias ' + spokenName(ev.user) + ' por el regalo!');
     const known = GIFTS.find(g => g.k === ev.gift);
@@ -604,7 +606,10 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
 /* ---------- SONIDO (WebAudio, sin archivos) + VOZ EN OFF (speechSynthesis) ----------
    Los navegadores exigen un toque/clic en la página antes de dejar sonar: toca una vez.
    (En OBS/fuente navegador: --autoplay-policy=no-user-gesture-required.) */
-let AC = null, sfxOn = true, voiceOn = true, vol = 0.7, esVoice = null, sayQ = 0;
+let AC = null, sfxOn = true, voiceOn = true, vol = 0.7, esVoice = null;
+const MAX_SPEECH_QUEUE = 30;
+const speechQueue = [];
+let speaking = false;
 function ac(){
   if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(_){} }
   if(AC && AC.state === 'suspended') AC.resume();
@@ -612,7 +617,7 @@ function ac(){
 }
 let unlocked = false;
 ['pointerdown', 'keydown', 'touchstart'].forEach(n => addEventListener(n, () => {
-  ac(); if(!unlocked && window.speechSynthesis){ unlocked = true; try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')); }catch(_){} }
+  ac(); if(!unlocked && window.speechSynthesis){ unlocked = true; try{ speechSynthesis.resume(); speechSynthesis.speak(new SpeechSynthesisUtterance('')); }catch(_){} }
 }, {passive:true}));
 function tone(f, t0, d, type, g, f2){
   if(!AC) return;
@@ -644,16 +649,34 @@ function pickVoice(){
 }
 if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 const spokenName = u => String(u).replace(/[_.\-]+/g, ' ').replace(/\d+/g, ' ').trim() || 'alguien';
-function say(text){                      // voz animada; sin emojis ni enlaces; máx. 10 frases en cola
-  if(!voiceOn || !window.speechSynthesis || sayQ >= 10) return;
-  text = String(text).replace(/https?:\S+/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').slice(0, 140).trim();
+function speakNext(){
+  if(!voiceOn || !window.speechSynthesis || speaking || !speechQueue.length) return;
+  const text = speechQueue.shift();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = esVoice ? esVoice.lang : 'es-ES'; if(esVoice) utterance.voice = esVoice;
+  utterance.pitch = 1.5; utterance.rate = 1.15; utterance.volume = vol;
+  let completed = false;
+  const finish = () => {
+    if(completed) return;
+    completed = true;
+    speaking = false;
+    setTimeout(speakNext, 0);
+  };
+  speaking = true;
+  utterance.onend = utterance.onerror = finish;
+  try { speechSynthesis.resume(); speechSynthesis.speak(utterance); }
+  catch(error) { finish(); console.warn('No se pudo leer el comentario:', error); }
+}
+function say(text){
+  if(!voiceOn || !window.speechSynthesis) return;
+  text = String(text).replace(/https?:\S+/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').slice(0, 300).trim();
   if(!text) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = esVoice ? esVoice.lang : 'es-ES'; if(esVoice) u.voice = esVoice;
-  u.pitch = 1.5; u.rate = 1.15; u.volume = vol;
-  sayQ++; u.onend = u.onerror = () => { sayQ = Math.max(0, sayQ - 1); };
-  try { speechSynthesis.resume(); speechSynthesis.speak(u); }
-  catch(error) { sayQ = Math.max(0, sayQ - 1); console.warn('No se pudo leer el comentario:', error); }
+  if(speechQueue.length >= MAX_SPEECH_QUEUE){
+    speechQueue.shift();
+    console.warn('Cola de voz llena; se descartó el comentario más antiguo.');
+  }
+  speechQueue.push(text);
+  speakNext();
 }
 
 /* ---------- BOT: emula 30 eventos por minuto (1 cada 2 s) ---------- */
@@ -667,13 +690,10 @@ function scheduleAutoGift(){
   autoGiftTimer = null;
   if(!AUTO_GIFT_ENABLED || poolGifts.length < 2) return;
   autoGiftTimer = setTimeout(() => {
-    const idleFor = performance.now() - lastEventAt;
-    if(idleFor >= AUTO_GIFT_INTERVAL_SECONDS * 1000){
-      const cerroGift = pick(poolGifts);
-      const oliGift = pick(poolGifts.filter(gift => gift.k !== cerroGift.k));
-      showGift('cerro', cerroGift.e);
-      showGift('oli', oliGift.e);
-    }
+    const cerroGift = pick(poolGifts);
+    const oliGift = pick(poolGifts.filter(gift => gift.k !== cerroGift.k));
+    showGift('cerro', cerroGift.e);
+    showGift('oli', oliGift.e);
     scheduleAutoGift();
   }, AUTO_GIFT_INTERVAL_SECONDS * 1000);
 }
@@ -710,7 +730,10 @@ function applyCfg(c){
   const rate = [30, 60, 90].includes(cfg.rate) ? cfg.rate : 30, bot = !wsUrl && cfg.bot === true;
   if(bot !== botOn || rate !== EVENTS_PER_MIN){ botOn = bot; EVENTS_PER_MIN = rate; setBot(bot); }
   sfxOn = cfg.sound !== false; voiceOn = cfg.voice !== false; vol = (cfg.vol >= 0 && cfg.vol <= 100 ? cfg.vol : 70) / 100;
-  if(!voiceOn && window.speechSynthesis) speechSynthesis.cancel();
+  if(!voiceOn){
+    speechQueue.length = 0;
+    if(window.speechSynthesis){ speechSynthesis.cancel(); speaking = false; }
+  }
   if(cfg.cmd && cfg.cmd.id !== lastCmd){          // regalo de prueba desde el panel (como si lo mandara un usuario)
     lastCmd = cfg.cmd.id; const t = teams[cfg.cmd.team];
     if(cfg.cmd.name === 'gift' && t && !t.gift) handleEvent({team:cfg.cmd.team, type:'gift', gift:pick(poolGifts.length ? poolGifts : GIFTS).k, user:'usuario_prueba'});
@@ -859,7 +882,7 @@ function updateGiftCounter(count){
   document.getElementById('giftCounterNumber').textContent = String(total);
   giftCounter.setAttribute('aria-label', `Regalos en esta transmisión: ${total}`);
 }
-if(qs.has('live')){                     // modo directo: sin botones de prueba y con márgenes libres para la interfaz de TikTok
+if(qs.has('live') || location.pathname === '/'){ // la URL principal abre el overlay directo
   document.body.classList.add('live');
 }
 const wsUrl = qs.get('ws') || (location.protocol === 'http:' || location.protocol === 'https:'
@@ -891,6 +914,17 @@ applyCfg(loadCfg());                    // arranca con lo guardado en el panel (
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(error => console.warn('No se pudo registrar la PWA:', error));
 }
+document.querySelectorAll('#head .flag').forEach(flag => {
+  flag.style.cursor = 'pointer';
+  flag.setAttribute('role', 'button');
+  flag.setAttribute('tabindex', '0');
+  flag.title = 'Recargar el overlay';
+  const refresh = () => location.reload();
+  flag.addEventListener('click', refresh);
+  flag.addEventListener('keydown', event => {
+    if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); refresh(); }
+  });
+});
 let wakeLock = null, fullscreenRequested = false;
 async function keepScreenAwake(){
   if(document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;

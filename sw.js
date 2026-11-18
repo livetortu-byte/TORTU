@@ -1,5 +1,5 @@
-const CACHE = 'tortugas-live-v2';
-const CORE = ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest'];
+const CACHE = 'tortugas-live-v3';
+const CORE = ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/version-check.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
   self.skipWaiting();

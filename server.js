@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,10 @@ import { TikTokLiveConnection, WebcastEvent } from 'tiktok-live-connector';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT) || 3000;
+const versionFiles = ['server.js', 'index.html', 'dashboard.html', 'events.html', 'manifest.webmanifest', 'sw.js', 'version-check.js'];
+const appVersion = createHash('sha256')
+  .update(Buffer.concat(await Promise.all(versionFiles.map(file => readFile(path.join(root, file))))))
+  .digest('hex').slice(0, 16);
 const configPath = process.env.CONFIG_PATH || path.join(root, '.tortugas-config.json');
 const giftCounterPath = process.env.GIFT_COUNTER_PATH || path.join(path.dirname(configPath), '.tortugas-gift-counter.json');
 const RETRY_MS = 5000;
@@ -306,6 +311,7 @@ async function bodyJson(request) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (url.pathname === '/api/status' && request.method === 'GET') return json(response, 200, status);
+  if (url.pathname === '/api/version' && request.method === 'GET') return json(response, 200, { version: appVersion });
   if (url.pathname === '/api/config' && request.method === 'GET') return json(response, 200, config);
   if (url.pathname === '/api/gift-counter/reset' && request.method === 'POST') {
     const previousCount = giftCounter;
@@ -400,7 +406,8 @@ const server = createServer(async (request, response) => {
   try {
     const info = await stat(file);
     if (!info.isFile()) return json(response, 404, { error: 'No encontrado' });
-    const content = await readFile(file);
+    let content = await readFile(file);
+    if (path.extname(file) === '.html') content = content.toString('utf8').replaceAll('__APP_VERSION__', appVersion);
     const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
     response.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
     response.end(content);

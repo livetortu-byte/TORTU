@@ -54,9 +54,13 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     }
     assert.equal(ready, true, 'server should start');
     assert.equal((await fetch(base + '/api/status')).status, 200);
-    for (const page of ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/sw.js']) {
+    for (const page of ['/', '/dashboard.html', '/events.html', '/manifest.webmanifest', '/sw.js', '/version-check.js']) {
       assert.equal((await fetch(base + page)).status, 200, `${page} should be served`);
     }
+    const appVersion = await (await fetch(base + '/api/version')).json();
+    assert.match(appVersion.version, /^[a-f0-9]{16}$/);
+    const rootHtml = await (await fetch(base + '/')).text();
+    assert.match(rootHtml, new RegExp(`<meta name="app-version" content="${appVersion.version}">`));
     const startupLogs = await (await fetch(base + '/api/connector-logs')).json();
     assert.ok(startupLogs.some(log => log.message.includes('Servidor iniciado')));
     await post(base, '/api/disconnect', {});
