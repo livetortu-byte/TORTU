@@ -16,7 +16,8 @@ const MAX_CONNECTOR_LOGS = 500;
 const defaultConfig = {
   on: true, show: 5, alertFall: 8, alertFallEnabled: false, gifts: ['rose', 'donut', 'heart', 'confetti', 'corgi', 'lion', 'galaxy', 'ice', 'rocket', 'diamond', 'crown', 'car', 'fireworks', 'music', 'star'],
   lanes: { cerro: true, oli: true },
-  meters: { like: 3, comment: 1, share: 5, follow: 10, join: 2 },
+  meters: { like: 5, comment: 15, share: 20, follow: 20, join: 2 },
+  autoGift: true, autoGiftInterval: 60,
   sound: true, voice: true, vol: 70, bot: false, rate: 30
 };
 let config = structuredClone(defaultConfig);
@@ -326,6 +327,12 @@ const server = createServer(async (request, response) => {
       }
       if (incoming.alertFallEnabled !== undefined && typeof incoming.alertFallEnabled !== 'boolean') {
         return json(response, 400, { error: 'La opción de caída debe ser booleana.' });
+      }
+      if (incoming.autoGift !== undefined && typeof incoming.autoGift !== 'boolean') {
+        return json(response, 400, { error: 'La opción de regalo automático debe ser booleana.' });
+      }
+      if (incoming.autoGiftInterval !== undefined && (!Number.isFinite(Number(incoming.autoGiftInterval)) || Number(incoming.autoGiftInterval) < 10 || Number(incoming.autoGiftInterval) > 600)) {
+        return json(response, 400, { error: 'El intervalo de regalo automático debe estar entre 10 y 600 segundos.' });
       }
       const nextConfig = {
         ...config, ...incoming,

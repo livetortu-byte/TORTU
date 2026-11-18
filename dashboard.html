@@ -81,9 +81,11 @@
   <h2>🎁 Regalos de los usuarios</h2>
   <div class="row"><label class="sw"><input type="checkbox" id="on"> Mostrar el regalo y el avatar de quien lo envía</label></div>
   <div class="row"><span>Tiempo del regalo en pantalla</span><span><input type="number" id="show" min="1" step="1"> segundos</span></div>
+  <div class="row"><label class="sw"><input type="checkbox" id="autoGift"> Mostrar un regalo aleatorio si no hay eventos</label></div>
+  <div class="row"><span>Esperar sin eventos</span><span><input type="number" id="autoGiftInterval" min="10" max="600" step="5"> segundos</span></div>
   <div class="row"><span>Mostrar en vía Cerro</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_cerro"> ON</label><button class="pri" data-test="cerro">Probar regalo</button></span></div>
   <div class="row"><span>Mostrar en vía Olimpia</span><span class="tools"><label class="sw"><input type="checkbox" id="lane_oli"> ON</label><button class="pri" data-test="oli">Probar regalo</button></span></div>
-  <p class="note">Los regalos los envían los usuarios (no hay regalo automático). Aquí eliges qué se muestra y cuánto tiempo (5 s por defecto). El efecto de la tortuga gigante ocurre siempre.</p>
+  <p class="note">El regalo aleatorio solo es decorativo: no avanza la tortuga ni cuenta como regalo real. Usa el catálogo habilitado y el tiempo de pantalla configurado.</p>
 </section>
 
 <section>
@@ -140,14 +142,17 @@ const GIFTS = [
   ['lion','🦁','León'],['galaxy','🌌','Galaxia'],['ice','🍦','Helado'],['rocket','🚀','Cohete'],['diamond','💎','Diamante'],
   ['crown','👑','Corona'],['car','🏎️','Auto'],['fireworks','🎆','Fuegos'],['music','🎵','Música'],['star','⭐','Estrella']
 ];
-const DEFM = {like:3, comment:1, share:5, follow:10, join:2};
-const DEF = {on:true, meters:DEFM, show:5, alertFall:8, alertFallEnabled:false, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
+const DEFM = {like:5, comment:15, share:20, follow:20, join:2};
+const DEF = {on:true, meters:DEFM, show:5, alertFall:8, alertFallEnabled:false, autoGift:true, autoGiftInterval:60, sound:true, voice:true, vol:70, gifts:GIFTS.map(g => g[0]), lanes:{cerro:true, oli:true}, bot:false, rate:30};
 const clampAlertFall = value => Math.max(3, Math.min(20, Number(value) || 8));
+const clampAutoGiftInterval = value => Math.max(10, Math.min(600, Math.round(Number(value) || 60)));
 let cfg;
 try{ cfg = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }catch(_){ cfg = Object.assign({}, DEF); }
 cfg.lanes = Object.assign({}, DEF.lanes, cfg.lanes);
 cfg.meters = Object.assign({}, DEFM, cfg.meters);
 cfg.alertFall = clampAlertFall(cfg.alertFall);
+cfg.autoGift = cfg.autoGift !== false;
+cfg.autoGiftInterval = clampAutoGiftInterval(cfg.autoGiftInterval);
 const $ = id => document.getElementById(id);
 let tm;
 function save(extra){
@@ -178,6 +183,13 @@ function drawGrid(){
 }
 $('on').checked = cfg.on; $('on').onchange = e => save({on:e.target.checked});
 $('show').value = cfg.show; $('show').onchange = e => save({show:Math.max(1, Math.round(+e.target.value) || 5)});
+$('autoGift').checked = cfg.autoGift; $('autoGift').onchange = e => save({autoGift:e.target.checked});
+$('autoGiftInterval').value = cfg.autoGiftInterval;
+$('autoGiftInterval').onchange = e => {
+  const seconds = clampAutoGiftInterval(e.target.value);
+  e.target.value = seconds;
+  save({autoGiftInterval:seconds});
+};
 $('alertFall').value = cfg.alertFall; $('alertFallValue').textContent = cfg.alertFall + ' s';
 $('alertFall').oninput = e => {
   const seconds = clampAlertFall(e.target.value);
@@ -211,7 +223,12 @@ $('bot').checked = cfg.bot; $('bot').onchange = e => save({bot:e.target.checked}
 $('rate').value = cfg.rate; $('rate').onchange = e => save({rate:+e.target.value});
 addEventListener('storage', e => {          // si cambia desde la carrera (botón ON de una vía), refleja el cambio aquí
   if(e.key !== KEY) return;
-  try{ const c = JSON.parse(e.newValue || '{}'); if(c.lanes){ cfg.lanes = c.lanes; $('lane_cerro').checked = c.lanes.cerro !== false; $('lane_oli').checked = c.lanes.oli !== false; } }catch(_){}
+  try{
+    const c = JSON.parse(e.newValue || '{}');
+    if(c.lanes){ cfg.lanes = c.lanes; $('lane_cerro').checked = c.lanes.cerro !== false; $('lane_oli').checked = c.lanes.oli !== false; }
+    if(typeof c.autoGift === 'boolean'){ cfg.autoGift = c.autoGift; $('autoGift').checked = c.autoGift; }
+    if(c.autoGiftInterval !== undefined){ cfg.autoGiftInterval = clampAutoGiftInterval(c.autoGiftInterval); $('autoGiftInterval').value = cfg.autoGiftInterval; }
+  }catch(_){}
 });
 drawGrid();
 
@@ -257,10 +274,13 @@ fetch('/api/config').then(response => response.ok ? response.json() : null).then
   cfg.meters = Object.assign({}, DEFM, cfg.meters);
   cfg.alertFall = clampAlertFall(cfg.alertFall);
   cfg.alertFallEnabled = cfg.alertFallEnabled === true;
+  cfg.autoGift = cfg.autoGift !== false;
+  cfg.autoGiftInterval = clampAutoGiftInterval(cfg.autoGiftInterval);
   localStorage.setItem(KEY, JSON.stringify(cfg));
   $('on').checked = cfg.on; $('show').value = cfg.show;
   $('alertFall').value = cfg.alertFall; $('alertFallValue').textContent = cfg.alertFall + ' s';
   $('alertFallEnabled').checked = cfg.alertFallEnabled;
+  $('autoGift').checked = cfg.autoGift; $('autoGiftInterval').value = cfg.autoGiftInterval;
   for(const k of ['cerro','oli']) $('lane_' + k).checked = cfg.lanes[k] !== false;
   drawGrid(); drawM();
   $('sound').checked = cfg.sound; $('voice').checked = cfg.voice;
@@ -277,6 +297,8 @@ function connectStatus(){
     if(data.type === 'config' && data.config) {
       cfg = Object.assign({}, cfg, data.config);
       localStorage.setItem(KEY, JSON.stringify(cfg));
+      if(typeof data.config.autoGift === 'boolean'){ $('autoGift').checked = data.config.autoGift; }
+      if(data.config.autoGiftInterval !== undefined){ $('autoGiftInterval').value = clampAutoGiftInterval(data.config.autoGiftInterval); }
     }
   };
   socket.onclose = () => setTimeout(connectStatus, 2000);

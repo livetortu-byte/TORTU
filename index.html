@@ -57,7 +57,7 @@
   #start{position:absolute;left:0;right:0;bottom:0;height:8px;background:#ffffff55;z-index:1}
 
   /* TORTUGA (crece desde la base; con regalo llega a 3 veces su tamaño) */
-  .turtle{position:absolute;left:50%;width:110px;height:138px;margin-left:-55px;z-index:2;
+  .turtle{position:absolute;left:50%;width:120px;height:150px;margin-left:-60px;z-index:2;
     transform-origin:50% 100%;will-change:transform}
   .turtle svg{width:100%;height:100%;display:block;overflow:visible;
     animation:sway calc(var(--paso)) ease-in-out infinite alternate;transform-origin:50% 55%}
@@ -218,16 +218,16 @@
           100 m a GIFT_SPEED m/s y gana.
 
   GAMIFICACIÓN (v2)
-    REGALO DE USUARIO  El regalo NO es automático: lo envía un espectador (evento gift). Al llegar,
-          la tortuga de su equipo crece x3 y camina sola; el regalo aparece bajo la bandera de meta de
-          esa vía durante GIFT_SHOW s (5 por defecto, con barra de tiempo) y el AVATAR REDONDO de quien lo
-          envió se pone sobre el caparazón, con su 🎁 y nombre debajo, hasta que acaba la carrera.
+    REGALO DE USUARIO  Cuando un espectador envía un regalo (evento gift), la tortuga de su equipo crece x3
+          y camina sola; el regalo aparece bajo la bandera de meta de esa vía durante GIFT_SHOW s (5 por
+          defecto, con barra de tiempo) y el AVATAR REDONDO de quien lo envió se pone sobre el caparazón.
+          Si no llegan eventos, un regalo del catálogo puede aparecer de forma decorativa según el panel.
           En dashboard.html: catálogo con casillas (qué regalos se MUESTRAN; el efecto x3 ocurre siempre),
           tiempo en pantalla, mostrar/ocultar por vía y un botón de regalo de prueba.
     SONIDO    Efectos sintetizados (WebAudio) por acción, combo, hito y victoria. Hace falta un toque en la
           página para que el navegador permita el audio.
-    VOZ EN OFF  Voz alegre en español (speechSynthesis): lee "usuario dice: comentario" (sin emojis ni
-          enlaces, máx. 3 en cola), agradece cada regalo y anuncia al ganador. El evento comment debe traer "text".
+    VOZ EN OFF  Voz alegre en español (speechSynthesis): lee "usuario, del equipo, dice: comentario" (sin
+          emojis ni enlaces, máx. 10 en cola), agradece cada regalo y anuncia al ganador. El evento comment debe traer "text".
     COMBO     Acciones del mismo equipo con menos de COMBO_WINDOW s entre sí encadenan
           racha: cada 4 acciones el multiplicador sube +0,5 (x1,5 · x2 · x2,5 máx.).
           Se ve como 🔥 xN junto al nombre del equipo.
@@ -311,9 +311,9 @@ function turtleSVG(id, c1, c2, edge){
     ${leg('a', 78, 90, 10, 7,    1)}
 
     <!-- cuello y cabeza con emoticón de estado de ánimo -->
-    <path d="M40 30 Q40 20 42 12 L54 12 Q56 20 56 30 Z" fill="url(#sk${id})" stroke="${skinDark}" stroke-width="2"/>
-    <ellipse cx="48" cy="13" rx="15" ry="15" fill="url(#sk${id})" stroke="${skinDark}" stroke-width="2.5"/>
-    <text id="mood${id}" x="48" y="13" text-anchor="middle" dominant-baseline="central" font-size="26"
+    <path d="M38 31 Q38 20 40 12 L56 12 Q58 20 58 31 Z" fill="url(#sk${id})" stroke="${skinDark}" stroke-width="2"/>
+    <ellipse cx="48" cy="14" rx="17" ry="16" fill="url(#sk${id})" stroke="${skinDark}" stroke-width="2.5"/>
+    <text id="mood${id}" x="48" y="14" text-anchor="middle" dominant-baseline="central" font-size="28"
           style="font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif">😐</text>
 
     <!-- caparazón = bandera del equipo -->
@@ -337,12 +337,14 @@ const VMAX = 4;            // m/s: velocidad visual máxima normal (pisada lenta
 let GIFT_SHOW = 5;       // s que el regalo queda en pantalla (bajo la bandera de meta)
 let ALERT_FALL_SECONDS = 8;
 let ALERT_FALL_ENABLED = false;
+let AUTO_GIFT_ENABLED = true;
+let AUTO_GIFT_INTERVAL_SECONDS = 60;
 const COMBO_WINDOW = 5;    // s máximos entre acciones para mantener la racha
 let giftsOn = true;        // mostrar el regalo gráfico (los regalos los envían los usuarios)
 const GIFT_CHANCE = 0.02;  // solo el bot: probabilidad de que un evento sea regalo
 const IDLE_EVERY = 10;     // s sin eventos globales antes de avanzar; se repite cada 10 s
 const IDLE_MIN = 0.1, IDLE_MAX = 3;   // m al azar que avanza en cada empujón de inactividad
-const BASE_H = 138;        // alto base de la tortuga en px (igual que en el CSS)
+const BASE_H = 150;        // alto base de la tortuga en px (igual que en el CSS)
 
 const teams = {
   cerro: {el:document.getElementById('tCerro'), lane:document.getElementById('laneCerro'), m:document.getElementById('mCerro'),
@@ -500,10 +502,10 @@ const P = {
   gift:'M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8h5.08v6z'
 };
 const ACTIONS = {
-  like:   {path:P.heart,   color:'#ff2d55', m:3},
-  comment:{path:P.comment, color:'#3b82f6', m:1},
-  follow: {path:P.plus,    color:'#22c55e', m:10},
-  share:  {path:P.share,   color:'#f59e0b', m:5},
+  like:   {path:P.heart,   color:'#ff2d55', m:5},
+  comment:{path:P.comment, color:'#3b82f6', m:15},
+  follow: {path:P.plus,    color:'#22c55e', m:20},
+  share:  {path:P.share,   color:'#f59e0b', m:20},
   join:   {path:null,      color:'#000',    m:2},   // icono = bandera del equipo
   gift:   {path:P.gift,    color:'#eab308', m:0}    // regalo: la tortuga crece x3 y camina hasta 100
 };
@@ -573,6 +575,7 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
   if(finished || !ACTIONS[ev.type] || !teams[ev.team]) return;
   const t = teams[ev.team];
   lastEventAt = performance.now();
+  scheduleAutoGift();
   for(const k in teams) teams[k].idle = lastEventAt;
   showAlert(ev);
   const moodNow = performance.now();
@@ -581,7 +584,7 @@ function handleEvent(ev){               // ev = {team:'cerro'|'oli', type:'like'
     t.moodUntil = moodNow + 10000;
   }
   sfx(ev.type);                          // sonido + voz en off
-  if(ev.type === 'comment' && ev.text) say(spokenName(ev.user) + ' dice: ' + ev.text);
+  if(ev.type === 'comment' && ev.text) say(`${spokenName(ev.nickname || ev.user)}, del equipo ${t.name}, dice: ${ev.text}`);
   if(ev.type === 'gift'){                // regalo de un usuario: tortuga x3 y camina sola; avatar en el caparazón
     t.gift = true; say('¡Gracias ' + spokenName(ev.user) + ' por el regalo!');
     const known = GIFTS.find(g => g.k === ev.gift);
@@ -641,15 +644,16 @@ function pickVoice(){
 }
 if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 const spokenName = u => String(u).replace(/[_.\-]+/g, ' ').replace(/\d+/g, ' ').trim() || 'alguien';
-function say(text){                      // voz animada; sin emojis ni enlaces; máx. 3 frases en cola
-  if(!voiceOn || !window.speechSynthesis || sayQ >= 3) return;
+function say(text){                      // voz animada; sin emojis ni enlaces; máx. 10 frases en cola
+  if(!voiceOn || !window.speechSynthesis || sayQ >= 10) return;
   text = String(text).replace(/https?:\S+/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').slice(0, 140).trim();
   if(!text) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = esVoice ? esVoice.lang : 'es-ES'; if(esVoice) u.voice = esVoice;
   u.pitch = 1.5; u.rate = 1.15; u.volume = vol;
   sayQ++; u.onend = u.onerror = () => { sayQ = Math.max(0, sayQ - 1); };
-  speechSynthesis.speak(u);
+  try { speechSynthesis.resume(); speechSynthesis.speak(u); }
+  catch(error) { sayQ = Math.max(0, sayQ - 1); console.warn('No se pudo leer el comentario:', error); }
 }
 
 /* ---------- BOT: emula 30 eventos por minuto (1 cada 2 s) ---------- */
@@ -657,6 +661,20 @@ let EVENTS_PER_MIN = 30;                // 30, 60 o 90 (botones de abajo)
 const POOL = ['like','like','like','like','like','like','like','like','like','comment','comment','comment','comment',
               'follow','follow','share','share','join','join','join'];
 const pick = a => a[Math.floor(Math.random()*a.length)];
+let autoGiftTimer = null;
+function scheduleAutoGift(){
+  clearTimeout(autoGiftTimer);
+  autoGiftTimer = null;
+  if(!AUTO_GIFT_ENABLED || !giftsOn || !poolGifts.length) return;
+  autoGiftTimer = setTimeout(() => {
+    const idleFor = performance.now() - lastEventAt;
+    if(idleFor >= AUTO_GIFT_INTERVAL_SECONDS * 1000){
+      const lanes = Object.keys(teams).filter(k => teams[k].autoOn);
+      if(lanes.length) showGift(pick(lanes), pick(poolGifts).e);
+    }
+    scheduleAutoGift();
+  }, AUTO_GIFT_INTERVAL_SECONDS * 1000);
+}
 const PHRASES = ['vamos cerro, tú puedes','arriba olimpia','qué carrera tan buena','saludos desde Ciudad del Este','dale tortuga dale',
                  'no se rindan','jajaja qué rápido','esta es la mía','fuerza equipo','quién gana hoy'];
 function botEvent(){
@@ -668,7 +686,7 @@ let botTimer = null, botOn = null;
 function setBot(on){ clearInterval(botTimer); botTimer = null; if(on) botTimer = setInterval(botEvent, 60000 / EVENTS_PER_MIN); }
 
 /* ---------- CONFIGURACIÓN (la escribe dashboard.html en localStorage 'tortugas.cfg') ----------
-   {on, show(s), gifts:[claves], lanes:{cerro,oli}, meters:{like,comment,follow,share,join}, sound, voice, vol(0-100), bot, rate, cmd:{id,name:'gift',team}}
+   {on, show(s), autoGift, autoGiftInterval(s), gifts:[claves], lanes:{cerro,oli}, meters:{like,comment,follow,share,join}, sound, voice, vol(0-100), bot, rate, cmd:{id,name:'gift',team}}
    Por defecto: regalo 5 s en pantalla, todo el catálogo, sonido y voz activos, bot APAGADO. */
 const CFG_KEY = 'tortugas.cfg';
 let cfg = {}, poolGifts = GIFTS, lastCmd = 0;
@@ -681,6 +699,8 @@ function applyCfg(c){
   GIFT_SHOW = cfg.show > 0 ? cfg.show : 5;
   ALERT_FALL_SECONDS = Number.isFinite(Number(cfg.alertFall)) ? Math.max(3, Math.min(20, Number(cfg.alertFall))) : 8;
   ALERT_FALL_ENABLED = cfg.alertFallEnabled === true;
+  AUTO_GIFT_ENABLED = cfg.autoGift !== false;
+  AUTO_GIFT_INTERVAL_SECONDS = Number.isFinite(Number(cfg.autoGiftInterval)) ? Math.max(10, Math.min(600, Number(cfg.autoGiftInterval))) : 60;
   document.getElementById('alerts').classList.toggle('falling-mode', ALERT_FALL_ENABLED);
   poolGifts = Array.isArray(cfg.gifts) ? GIFTS.filter(g => cfg.gifts.includes(g.k)) : GIFTS;
   setGift(cfg.on !== false);
@@ -693,6 +713,7 @@ function applyCfg(c){
     lastCmd = cfg.cmd.id; const t = teams[cfg.cmd.team];
     if(cfg.cmd.name === 'gift' && t && !t.gift) handleEvent({team:cfg.cmd.team, type:'gift', gift:pick(poolGifts.length ? poolGifts : GIFTS).k, user:'usuario_prueba'});
   }
+  scheduleAutoGift();
 }
 addEventListener('storage', e => { if(e.key === CFG_KEY) applyCfg(loadCfg()); });
 
