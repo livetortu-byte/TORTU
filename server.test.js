@@ -36,10 +36,12 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
   const port = await availablePort();
   const base = `http://127.0.0.1:${port}`;
   const giftCounterFile = path.join(tmpdir(), `tortugas-gift-counter-${randomUUID()}.json`);
+  const matchCounterFile = path.join(tmpdir(), `tortugas-match-counter-${randomUUID()}.json`);
   await writeFile(giftCounterFile, JSON.stringify({ count: 7, roomId: 'test-room' }));
+  await writeFile(matchCounterFile, JSON.stringify({ count: 12 }));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0', GIFT_COUNTER_PATH: giftCounterFile },
+    env: { ...process.env, PORT: String(port), AUTOCONNECT_TIKTOK: '0', GIFT_COUNTER_PATH: giftCounterFile, MATCH_COUNTER_PATH: matchCounterFile },
     stdio: 'ignore'
   });
   let socket;
@@ -97,8 +99,40 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
       };
       socket.on('message', onMessage);
     });
+    const initialMatchCounter = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Initial match counter timed out')), 3000);
+      const onMessage = message => {
+        const data = JSON.parse(message.toString());
+        if (data.type !== 'matchCounter') return;
+        clearTimeout(timeout);
+        socket.off('message', onMessage);
+        resolve(data);
+      };
+      socket.on('message', onMessage);
+    });
     await once(socket, 'open');
     assert.equal(await initialGiftCounter, 7);
+    const matchStart = await initialMatchCounter;
+    assert.equal(matchStart.count, 12);
+    assert.equal(typeof matchStart.matchId, 'string');
+    const matchCounterUpdate = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Match counter update timed out')), 3000);
+      const onMessage = message => {
+        const data = JSON.parse(message.toString());
+        if (data.type !== 'matchCounter' || data.count !== 13) return;
+        clearTimeout(timeout);
+        socket.off('message', onMessage);
+        resolve(data);
+      };
+      socket.on('message', onMessage);
+    });
+    const matchFinishedResponse = await post(base, '/api/match-finished', { matchId: matchStart.matchId, winner: 'cerro' });
+    assert.equal(matchFinishedResponse.status, 200);
+    assert.equal((await matchFinishedResponse.json()).count, 13);
+    assert.equal((await matchCounterUpdate).count, 13);
+    const duplicateMatchResponse = await post(base, '/api/match-finished', { matchId: matchStart.matchId, winner: 'oli' });
+    assert.equal((await duplicateMatchResponse.json()).duplicate, true);
+    assert.equal(JSON.parse(await readFile(matchCounterFile, 'utf8')).count, 13);
     const resetCounterUpdate = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Gift counter reset timed out')), 3000);
       const onMessage = message => {
@@ -182,5 +216,6 @@ test('TikTok events are logged and forwarded to the overlay with config applied'
     if (savedConfig) await writeFile(configFile, savedConfig);
     else await rm(configFile, { force: true });
     await rm(giftCounterFile, { force: true });
+    await rm(matchCounterFile, { force: true });
   }
 });

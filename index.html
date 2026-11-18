@@ -102,7 +102,7 @@
   #bar{flex:0 0 auto;height:46px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0 12px;background:#000}
   body.live #bar{background:transparent;pointer-events:none}
   #bar button{font-family:inherit;font-size:12px;color:#fff;border:3px solid #fff;border-radius:22px;padding:5px 10px;white-space:nowrap}
-  #giftCounter{display:flex;align-items:center;justify-content:flex-end;min-width:44px;color:#fff;
+  #giftCounter,#matchCounter{display:flex;align-items:center;justify-content:flex-end;min-width:44px;color:#fff;
     font:700 clamp(24px,5vw,34px)/1 Arial,Helvetica,sans-serif;text-shadow:0 2px 6px #000;white-space:nowrap}
   #botBtn{background:#16a34a}
   #botBtn.off{background:#6b7280}
@@ -175,7 +175,10 @@
     <div id="winner"><div id="wtext"></div></div>
   </div>
 
-  <a id="bar" href="dashboard.html" aria-label="Panel"><span id="giftCounter" role="status" aria-label="Regalos en esta transmisión: 0"><span id="giftCounterNumber">0</span></span></a>
+  <a id="bar" href="dashboard.html" aria-label="Panel">
+    <span id="matchCounter" role="status" aria-label="Partidos jugados: 0"><span id="matchCounterNumber">0</span></span>
+    <span id="giftCounter" role="status" aria-label="Regalos en esta transmisión: 0"><span id="giftCounterNumber">0</span></span>
+  </a>
 </div>
 
 <script>
@@ -398,6 +401,7 @@ function mvp(k){
 let shown = {cerro:0, oli:0};           // posición visual (metros)
 let scale = {cerro:1, oli:1};           // tamaño visual
 let finished = false, winner = null, last = 0;
+let activeMatchId = '', raceMatchId = '';
 
 /* Estado de ánimo que se ve en la cabeza */
 function moodOf(k, now){
@@ -474,7 +478,28 @@ function win(k){
   const star = mvp(k); if(star) document.getElementById('mvp').textContent = '⭐ MVP ' + star;   // textContent: el nombre viene de fuera
   document.getElementById('winner').classList.add('show');
   sfx('win'); say('¡Gana ' + teams[k].name + '!');
+  reportMatchFinished(k);
   setTimeout(reset, 3000);
+}
+
+async function reportMatchFinished(team){
+  if(!raceMatchId || !['http:', 'https:'].includes(location.protocol)) return;
+  const matchId = raceMatchId;
+  for(let attempt = 0; attempt < 3; attempt++){
+    try {
+      const response = await fetch('/api/match-finished', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body:JSON.stringify({matchId, winner:team})
+      });
+      const result = await response.json();
+      if(!response.ok) throw new Error(result.error || 'No se pudo contar el partido.');
+      updateMatchCounter(result.count, result.matchId);
+      return;
+    } catch(error) {
+      if(attempt === 2) console.error('No se pudo registrar el partido terminado:', error);
+      else await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
 }
 
 function addMeters(team, n){            // <- AQUÍ conectas tus eventos (likes, comentarios, etc.)
@@ -484,6 +509,7 @@ function addMeters(team, n){            // <- AQUÍ conectas tus eventos (likes,
 
 function reset(){
   lastEventAt = performance.now();
+  if(activeMatchId) raceMatchId = activeMatchId;
   for(const k in teams){
     const t = teams[k];
     t.meters = 0; t.gift = false; t.moodUntil = 0;
@@ -882,6 +908,17 @@ function updateGiftCounter(count){
   document.getElementById('giftCounterNumber').textContent = String(total);
   giftCounter.setAttribute('aria-label', `Regalos en esta transmisión: ${total}`);
 }
+function updateMatchCounter(count, matchId){
+  const total = Number(count);
+  if(Number.isSafeInteger(total) && total >= 0){
+    document.getElementById('matchCounterNumber').textContent = String(total);
+    document.getElementById('matchCounter').setAttribute('aria-label', `Partidos jugados: ${total}`);
+  }
+  if(typeof matchId === 'string'){
+    activeMatchId = matchId;
+    if(!raceMatchId) raceMatchId = matchId;
+  }
+}
 if(qs.has('live') || location.pathname === '/'){ // la URL principal abre el overlay directo
   document.body.classList.add('live');
 }
@@ -898,6 +935,7 @@ if(wsUrl){
         const d = JSON.parse(e.data);
         if(d.type === 'connection' && d.status) updateConnectionIndicator(d.status.state);
         else if(d.type === 'giftCounter' && Number.isFinite(Number(d.count))) updateGiftCounter(d.count);
+        else if(d.type === 'matchCounter') updateMatchCounter(d.count, d.matchId);
         else if(d.type === 'raceEvent' && d.event) handleEvent(d.event);
         else if(d.type === 'config' && d.config) applyCfg(d.config);
         else if(ACTIONS[d.type] && teams[d.team]) handleEvent(d);

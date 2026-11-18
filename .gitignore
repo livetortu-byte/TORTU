@@ -2,6 +2,7 @@ node_modules/
 **/node_modules/
 .tortugas-config.json
 .tortugas-gift-counter.json
+.tortugas-match-counter.json
 .env
 .env.*
 !.env.example

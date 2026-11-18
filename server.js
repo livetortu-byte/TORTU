@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,7 @@ const appVersion = createHash('sha256')
   .digest('hex').slice(0, 16);
 const configPath = process.env.CONFIG_PATH || path.join(root, '.tortugas-config.json');
 const giftCounterPath = process.env.GIFT_COUNTER_PATH || path.join(path.dirname(configPath), '.tortugas-gift-counter.json');
+const matchCounterPath = process.env.MATCH_COUNTER_PATH || path.join(path.dirname(configPath), '.tortugas-match-counter.json');
 const RETRY_MS = 5000;
 const RETRY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_EVENTS = 500;
@@ -47,6 +48,15 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') console.warn('No se pudo cargar el contador de regalos:', error.message);
 }
+let matchCounter = 0;
+try {
+  const saved = JSON.parse(await readFile(matchCounterPath, 'utf8'));
+  if (Number.isSafeInteger(saved.count) && saved.count >= 0) matchCounter = saved.count;
+  else console.warn('El contador de partidos guardado no tiene un formato válido.');
+} catch (error) {
+  if (error.code !== 'ENOENT') console.warn('No se pudo cargar el contador de partidos:', error.message);
+}
+let activeMatchId = randomUUID();
 let status = { state: 'disconnected', username: 'tortulive', retryCount: 0, message: 'Desconectado' };
 let connection = null;
 let connectionGeneration = 0;
@@ -58,6 +68,8 @@ const eventLog = [];
 const connectorLogs = [];
 const sockets = new Set();
 let giftCounterWrite = Promise.resolve();
+let matchCounterWrite = Promise.resolve();
+let matchFinishQueue = Promise.resolve();
 
 function broadcast(payload) {
   const text = JSON.stringify(payload);
@@ -104,6 +116,34 @@ function persistGiftCounter() {
   giftCounterWrite = giftCounterWrite.catch(() => {}).then(() => writeFile(giftCounterPath, snapshot, 'utf8'));
   giftCounterWrite.catch(error => console.error('No se pudo guardar el contador de regalos:', error.message));
   return giftCounterWrite;
+}
+
+function persistMatchCounter() {
+  const snapshot = JSON.stringify({ count: matchCounter });
+  matchCounterWrite = matchCounterWrite.catch(() => {}).then(() => writeFile(matchCounterPath, snapshot, 'utf8'));
+  matchCounterWrite.catch(error => console.error('No se pudo guardar el contador de partidos:', error.message));
+  return matchCounterWrite;
+}
+
+function finishMatch(matchId, winner) {
+  const operation = matchFinishQueue.then(async () => {
+    if (matchId !== activeMatchId) return { count: matchCounter, matchId: activeMatchId, duplicate: true };
+    const previousCount = matchCounter;
+    const previousMatchId = activeMatchId;
+    matchCounter++;
+    activeMatchId = randomUUID();
+    try { await persistMatchCounter(); }
+    catch (error) {
+      matchCounter = previousCount;
+      activeMatchId = previousMatchId;
+      throw error;
+    }
+    const result = { count: matchCounter, matchId: activeMatchId, duplicate: false, winner };
+    broadcast({ type: 'matchCounter', ...result });
+    return result;
+  });
+  matchFinishQueue = operation.catch(() => {});
+  return operation;
 }
 
 function connectionError(error) {
@@ -313,6 +353,18 @@ const server = createServer(async (request, response) => {
   if (url.pathname === '/api/status' && request.method === 'GET') return json(response, 200, status);
   if (url.pathname === '/api/version' && request.method === 'GET') return json(response, 200, { version: appVersion });
   if (url.pathname === '/api/config' && request.method === 'GET') return json(response, 200, config);
+  if (url.pathname === '/api/match-finished' && request.method === 'POST') {
+    try {
+      const incoming = await bodyJson(request);
+      if (typeof incoming.matchId !== 'string' || !['cerro', 'oli'].includes(incoming.winner)) {
+        return json(response, 400, { error: 'El identificador del partido o el ganador no son válidos.' });
+      }
+      return json(response, 200, await finishMatch(incoming.matchId, incoming.winner));
+    } catch (error) {
+      console.error('No se pudo registrar el partido terminado:', error.message);
+      return json(response, 500, { error: 'No se pudo guardar el partido terminado.' });
+    }
+  }
   if (url.pathname === '/api/gift-counter/reset' && request.method === 'POST') {
     const previousCount = giftCounter;
     giftCounter = 0;
@@ -400,7 +452,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname.startsWith('/api/')) return json(response, 404, { error: 'No encontrado' });
 
   const requested = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
-  if (['.tortugas-config.json', '.tortugas-gift-counter.json'].includes(requested)) return json(response, 404, { error: 'No encontrado' });
+  if (['.tortugas-config.json', '.tortugas-gift-counter.json', '.tortugas-match-counter.json'].includes(requested)) return json(response, 404, { error: 'No encontrado' });
   const file = path.resolve(root, requested);
   if (!file.startsWith(`${root}${path.sep}`) && file !== root) return json(response, 403, { error: 'Prohibido' });
   try {
@@ -421,6 +473,7 @@ wss.on('connection', socket => {
   socket.send(JSON.stringify({ type: 'connection', status }));
   socket.send(JSON.stringify({ type: 'connectorLogs', logs: connectorLogs }));
   socket.send(JSON.stringify({ type: 'giftCounter', count: giftCounter }));
+  socket.send(JSON.stringify({ type: 'matchCounter', count: matchCounter, matchId: activeMatchId }));
   socket.on('close', () => sockets.delete(socket));
   socket.on('error', () => sockets.delete(socket));
 });
@@ -434,6 +487,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
     await disconnectTikTok();
     await giftCounterWrite.catch(error => console.error('No se pudo completar el guardado del contador:', error.message));
+    await matchCounterWrite.catch(error => console.error('No se pudo completar el guardado del contador de partidos:', error.message));
     server.close(() => process.exit(0));
   });
 }
